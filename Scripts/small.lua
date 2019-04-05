@@ -97,12 +97,14 @@ end
 local function RestoreAfterDelay()
 	Signal(SIG_RESTORE)
 	SetSignalMask(SIG_RESTORE)
-	Sleep(2750)
-	Spin(r_gun_barr, z_axis, 0, math.rad(35))
-	Spin(l_gun_barr, z_axis, 0, math.rad(35))
-	Turn(head, y_axis, 0, math.rad(90))
-	Turn(r_gun, x_axis, 0, math.rad(45))
-	Turn(l_gun, x_axis, 0, math.rad(45))
+	Sleep(100)
+	Spin(r_gun_barr, z_axis, 0, math.rad(40))
+	Spin(l_gun_barr, z_axis, 0, math.rad(40))
+	Turn(head, y_axis, 0, math.rad(500))
+	Turn(r_gun, x_axis, 0, math.rad(500))
+	Turn(l_gun, x_axis, 0, math.rad(500))
+	
+	--Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushResistant", false)
 end
 
 function script.AimFromWeapon()
@@ -125,10 +127,12 @@ function script.AimWeapon(num, heading, pitch)
 	if speed > 0.05 then
 		return false
 	end
+	StartThread(RestoreAfterDelay)
+	--Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushResistant", true)
 
-	Turn(head, y_axis, heading, math.rad(1000))
-	Turn(l_gun, x_axis, -pitch, math.rad(500))
-	Turn(r_gun, x_axis, -pitch, math.rad(500))
+	Turn(head, y_axis, heading, math.rad(800))
+	Turn(l_gun, x_axis, -pitch, math.rad(800))
+	Turn(r_gun, x_axis, -pitch, math.rad(800))
 	WaitForTurn(head, y_axis)
 	WaitForTurn(l_gun, x_axis)
 	WaitForTurn(r_gun, x_axis)
@@ -144,7 +148,6 @@ function script.FireWeapon(num)
 		EmitSfx(l_gun_barr, GG.Script.UNIT_SFX1)
 		Spin(l_gun_barr, z_axis, math.rad(1000), math.rad(50))
 	end
-	StartThread(RestoreAfterDelay)
 end
 
 function script.Killed(recentDamage, maxHealth)
