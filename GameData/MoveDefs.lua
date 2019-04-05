@@ -26,7 +26,7 @@ local moveDefs  =    {
 		},
 		
 		avoidMobilesOnPath     = true,
-		allowTerrainCollisions = true,
+		allowTerrainCollisions = false, -- Defaults to true,
 		allowRawMovement       = true, -- Defaults to false.
 		heatMapping            = false,
 		flowMapping            = true,

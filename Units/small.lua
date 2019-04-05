@@ -18,9 +18,9 @@ unitDef = {
 	maxWaterDepth          = 0,
 	
 	-- Size
-	--collisionVolumeOffsets = [[0 0 0]],
-	--collisionVolumeScales  = [[24 29 24]],
-	--collisionVolumeType    = [[cylY]],
+	collisionVolumeOffsets = [[0 0 0]],
+	collisionVolumeScales  = [[50 50 50]],
+	collisionVolumeType    = [[sphere]],
 	objectName             = [[mbot.s3o]],
 	script                 = [[small.lua]],
 	footprintX             = 2,
@@ -32,8 +32,7 @@ unitDef = {
 	maxVelocity            = 3,
 	acceleration           = 4,
 	brakeRate              = 2,
-	turnRate               = 0.18*33750, -- 33750 is 180 degrees in 1 frame
-	--pushResistant          = true,
+	turnRate               = 0.16*33750, -- 33750 is 180 degrees in 1 frame
 
 	-- Movement defaults
 	maxReverseVelocity     = 0,
@@ -43,9 +42,11 @@ unitDef = {
 	turnInPlace            = true,
 	turnInPlaceSpeedLimit  = 10,
 	turnInPlaceAngleLimit  = 0,
+	pushResistant          = false, -- Is broken
 	
 	customParams           = {
-		turnaccel          = 0.22*33750,
+		turnaccel          = 0.16*33750,
+		modelradius        = 25,
 	},
 
 	weapons                = {
