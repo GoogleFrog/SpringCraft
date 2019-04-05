@@ -27,7 +27,7 @@ local moveDefs  =    {
 		
 		avoidMobilesOnPath     = true,
 		allowTerrainCollisions = false, -- Defaults to true,
-		allowRawMovement       = false, -- Defaults to false.
+		allowRawMovement       = true, -- Defaults to false.
 		heatMapping            = false,
 		flowMapping            = true,
 		heatMod                = (1 / (GAME_SPEED * 2)) * 0.25,
