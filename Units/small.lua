@@ -42,7 +42,7 @@ unitDef = {
 	turnInPlace            = true,
 	turnInPlaceSpeedLimit  = 10,
 	turnInPlaceAngleLimit  = 0,
-	pushResistant          = false, -- Is broken
+	pushResistant          = true, -- Is broken
 	
 	customParams           = {
 		turnaccel          = 0.16*33750,
