@@ -1,3 +1,7 @@
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
 local function RecursiveReplaceStrings(t, name, replacedMap)
 	if (replacedMap[t]) then
 		return  -- avoid recursion / repetition
@@ -19,9 +23,24 @@ local function ReplaceStrings(t, name)
 	RecursiveReplaceStrings(t, name, replacedMap)
 end
 
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+--
+-- customParams is never nil
+
+for _, ud in pairs(UnitDefs) do
+	ud.customparams = ud.customparams or {}
+end
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
 -- Process ALL the units!
 for name, ud in pairs(UnitDefs) do
 	-- Replace all occurences of <NAME> with the respective values
 	ReplaceStrings(ud, ud.unitname or name)
 	Spring.Echo(name)
 end
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------

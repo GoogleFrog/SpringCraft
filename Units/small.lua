@@ -1,5 +1,5 @@
 unitDef = {
-	unitname               = [[shieldraid]],
+	unitname               = [[small]],
 	name                   = [[Bandit]],
 	description            = [[Small unit]],
 	
@@ -7,10 +7,12 @@ unitDef = {
 	canGuard               = true,
 	canMove                = true,
 	canPatrol              = true,
+	canAttack              = true,
 	sightDistance          = 500,
 	idleAutoHeal           = 0,
 	idleTime               = 1800,
 	maxDamage              = 265,
+	category               = [[LAND]],
 	
 	-- Construction
 	buildCostMetal         = 75,
@@ -19,8 +21,8 @@ unitDef = {
 	
 	-- Size
 	collisionVolumeOffsets = [[0 0 0]],
-	collisionVolumeScales  = [[50 50 50]],
-	collisionVolumeType    = [[sphere]],
+	collisionVolumeScales  = [[15 30 15]],
+	collisionVolumeType    = [[CylY]],
 	objectName             = [[mbot.s3o]],
 	script                 = [[small.lua]],
 	footprintX             = 2,
@@ -30,9 +32,10 @@ unitDef = {
 	-- Movement
 	movementClass          = [[SMALL_UNIT]],
 	maxVelocity            = 3,
-	acceleration           = 4,
+	acceleration           = 3,
 	brakeRate              = 2,
 	turnRate               = 0.16*33750, -- 33750 is 180 degrees in 1 frame
+	moveState              = 0, -- Prevent movement while firing
 
 	-- Movement defaults
 	maxReverseVelocity     = 0,
@@ -46,14 +49,13 @@ unitDef = {
 	
 	customParams           = {
 		turnaccel          = 0.16*33750,
-		modelradius        = 25,
+		modelradius        = 15,
 	},
 
 	weapons                = {
 		{
 			def                = [[WEAPON]],
-			badTargetCategory  = [[FIXEDWING]],
-			onlyTargetCategory = [[FIXEDWING LAND SINK TURRET SHIP SWIM FLOAT GUNSHIP HOVER]],
+			onlyTargetCategory = [[LAND]],
 		},
 	},
 
@@ -65,15 +67,24 @@ unitDef = {
 			coreThickness           = 0.5,
 			craterBoost             = 0,
 			craterMult              = 0,
+			avoidGround             = false,
+			avoidNeutral            = false,
+			avoidFeature            = false,
+			avoidFriendly           = false,
+			collideGround           = false,
+			collideNeutral          = false,
+			collideFeature          = false,
+			collideFriendly         = false,
+			collideNonTarget        = false,
+			canAttackGround         = false,
+			cylinderTargeting       = 1,
 
-			customParams        = {
-			light_camera_height = 1200,
-			light_radius = 120,
+			customParams            = {
+				reaim_time = 1,
 			},
 
 			damage                  = {
-			default = 9.53,
-			subs    = 0.61,
+				default = 0.1,
 			},
 
 			duration                = 0.02,

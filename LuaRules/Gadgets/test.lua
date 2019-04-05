@@ -22,7 +22,11 @@ end
 -------------------------------------------------------------------------------------
 
 function gadget:UnitCreated(unitID, unitDefID, teamID)
-	--Spring.Utilities.UnitEcho(unitID, unitDefID)
+	--if math.random() < 0.1 then
+	--	-- Cause a unit to not interact with other units pathfinding
+	--	Spring.Utilities.UnitEcho(unitID, "phase")
+	--	Spring.SetUnitBlocking(unitID, false, false)
+	--end
 end
 
 -------------------------------------------------------------------------------------

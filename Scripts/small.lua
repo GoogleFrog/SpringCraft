@@ -60,7 +60,7 @@ function script.Create()
 	StartThread(GG.Script.SmokeUnit, smokePiece)
 	Turn(rightLeg.thigh, x_axis, math.rad(60))
 	Turn(leftLeg.thigh, x_axis, math.rad(60))
-				
+	
 	Move(rightLeg.shin, z_axis, 0)
 	Move(leftLeg.shin, z_axis, 0)
 	
@@ -74,7 +74,7 @@ local function Stopping()
 	
 	Turn(rightLeg.thigh, x_axis, math.rad(60), math.rad(200))
 	Turn(leftLeg.thigh, x_axis, math.rad(60), math.rad(200))
-				
+	
 	Move(rightLeg.shin, z_axis, 0, 200)
 	Move(leftLeg.shin, z_axis, 0, 200)
 	
@@ -83,7 +83,7 @@ local function Stopping()
 	
 	Move(base, y_axis, 0, 200)
 	Move(base, z_axis, 0, 200)
-	Turn(base, z_axis, math.rad(-(0)), math.rad(200))
+	Turn(base, z_axis, math.rad(0), math.rad(200))
 end
 
 function script.StartMoving()
@@ -110,7 +110,7 @@ function script.AimFromWeapon()
 end
 
 function script.QueryWeapon(num)
-	if gun_1 then	
+	if gun_1 then
 		return r_gun_barr
 	else
 		return l_gun_barr
@@ -120,6 +120,11 @@ end
 function script.AimWeapon(num, heading, pitch)
 	Signal(SIG_AIM)
 	SetSignalMask(SIG_AIM)
+	
+	local speed = select(4, Spring.GetUnitVelocity(unitID))
+	if speed > 0.05 then
+		return false
+	end
 
 	Turn(head, y_axis, heading, math.rad(1000))
 	Turn(l_gun, x_axis, -pitch, math.rad(500))
@@ -132,7 +137,7 @@ end
 
 function script.FireWeapon(num) 
 	gun_1 = not gun_1
-	if gun_1 then	
+	if gun_1 then
 		EmitSfx(r_gun_barr, GG.Script.UNIT_SFX1)
 		Spin(r_gun_barr, z_axis, math.rad(1000), math.rad(50))
 	else

@@ -35,6 +35,9 @@ local function UnpackInt3(str)
 	return ret
 end
 
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
 local modelRadii = {}
 for i = 1,#UnitDefs do
 	local ud = UnitDefs[i]
@@ -55,7 +58,6 @@ for i = 1,#UnitDefs do
 	end
 end
 
-
 local function GetModelRadii(unitDefID)
 	if modelRadii[unitDefID] == true then
 		local ud = UnitDefs[unitDefID]
@@ -70,6 +72,24 @@ local function GetModelRadii(unitDefID)
 	return modelRadii[unitDefID]
 end
 
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+local reaimTimeDefs = {}
+
+for udID = 1, #UnitDefs do
+	local weapons = UnitDefs[udID].weapons
+	for i = 1, #weapons do
+		local wd = WeaponDefs[weapons[i].weaponDef]
+		if wd and wd.customParams.reaim_time then
+			reaimTimeDefs[udID] = reaimTimeDefs[udID] or {}
+			reaimTimeDefs[udID][i] = tonumber(wd.customParams.reaim_time)
+		end
+	end
+end
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
 function gadget:UnitCreated(unitID, unitDefID, teamID)
 	local ud = UnitDefs[unitDefID]
 	if getMovetype(ud) == 2 and spMoveCtrlGetTag(unitID) == nil then -- Ground/Sea
@@ -81,6 +101,12 @@ function gadget:UnitCreated(unitID, unitDefID, teamID)
 	if modelRadii[unitDefID] then
 		local mr = GetModelRadii(unitDefID)
 		spSetUnitRadiusAndHeight(unitID, mr.radius, mr.height)
+	end
+	
+	if reaimTimeDefs[unitDefID] then
+		for weaponNum, reaimTime in pairs(reaimTimeDefs[unitDefID]) do
+			Spring.SetUnitWeaponState(unitID, weaponNum, "reaimTime", reaimTime)
+		end
 	end
 end
 

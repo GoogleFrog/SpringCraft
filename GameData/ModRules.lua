@@ -20,9 +20,9 @@ local modRules = {
 	},
 	sensors = {
 		los = {
-			losMipLevel = 6,  -- defaults to 1
-			losMul      = 6,  -- defaults to 1
-			airMipLevel = 6,  -- defaults to 2
+			losMipLevel = 2,  -- defaults to 1
+			losMul      = 1,  -- defaults to 1
+			airMipLevel = 2,  -- defaults to 2
 		},
 	},
 	flankingBonus = {
