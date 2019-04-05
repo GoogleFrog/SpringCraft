@@ -3,7 +3,7 @@
 
 local moveDefs  =    {
     {
-        name            =   "Bot2x2",
+        name            =   "SMALL_UNIT",
         footprintX      =   2,
         footprintZ      =   2,
         maxWaterDepth   =   20,
