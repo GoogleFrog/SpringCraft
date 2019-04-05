@@ -52,8 +52,15 @@ numallies=0;
 }
 [team1]
 {
-teamleader=1;
+teamleader=0;
 allyteam=1;
+}
+[ai0]
+{
+shortname=Null AI;
+name=AI: Null AI;
+team=1;
+host=0;
 }
 [modoptions]
 {
@@ -68,11 +75,6 @@ numallies=0;
 teamleader=0;
 allyteam=0;
 }
-[player1]
-{
-team=1;
-name=Enemy;
-}
 [player0]
 {
 team=0;
@@ -83,7 +85,8 @@ myplayername=UnnamedPlayer;
 ishost=1;
 gametype=SpringCraft $VERSION;
 nohelperais=0;
-}]]
+}
+]]
 			Spring.Restart("", startScript)
 		end
 	end
