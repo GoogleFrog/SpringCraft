@@ -2,32 +2,50 @@ unitDef = {
 	unitname               = [[shieldraid]],
 	name                   = [[Bandit]],
 	description            = [[Small unit]],
-	acceleration           = 0.5,
-	brakeRate              = 0.4,
-	buildCostMetal         = 75,
+	
+	-- Abilities
 	canGuard               = true,
 	canMove                = true,
 	canPatrol              = true,
-	collisionVolumeOffsets = [[0 0 0]],
-	collisionVolumeScales  = [[24 29 24]],
-	collisionVolumeType    = [[cylY]],
-	explodeAs              = [[SMALL_UNITEX]],
-	footprintX             = 2,
-	footprintZ             = 2,
+	sightDistance          = 500,
 	idleAutoHeal           = 0,
 	idleTime               = 1800,
 	maxDamage              = 265,
+	
+	-- Construction
+	buildCostMetal         = 75,
 	maxSlope               = 36,
-	maxVelocity            = 3,
 	maxWaterDepth          = 0,
-	movementClass          = [[SMALL_UNIT]],
+	
+	-- Size
+	--collisionVolumeOffsets = [[0 0 0]],
+	--collisionVolumeScales  = [[24 29 24]],
+	--collisionVolumeType    = [[cylY]],
 	objectName             = [[mbot.s3o]],
 	script                 = [[small.lua]],
-	sightDistance          = 500,
-	turnRate               = 2500,
+	footprintX             = 2,
+	footprintZ             = 2,
 	upright                = true,
+	
+	-- Movement
+	movementClass          = [[SMALL_UNIT]],
+	maxVelocity            = 3,
+	acceleration           = 4,
+	brakeRate              = 2,
+	turnRate               = 0.18*33750, -- 33750 is 180 degrees in 1 frame
+	--pushResistant          = true,
 
+	-- Movement defaults
+	maxReverseVelocity     = 0,
+	minCollisionSpeed      = 1,
+	blocking               = true,
+	collide                = true,
+	turnInPlace            = true,
+	turnInPlaceSpeedLimit  = 10,
+	turnInPlaceAngleLimit  = 0,
+	
 	customParams           = {
+		turnaccel          = 0.22*33750,
 	},
 
 	weapons                = {

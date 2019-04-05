@@ -22,7 +22,7 @@ end
 -------------------------------------------------------------------------------------
 
 function gadget:UnitCreated(unitID, unitDefID, teamID)
-	Spring.Utilities.UnitEcho(unitID, unitDefID)
+	--Spring.Utilities.UnitEcho(unitID, unitDefID)
 end
 
 -------------------------------------------------------------------------------------
