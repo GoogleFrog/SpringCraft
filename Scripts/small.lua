@@ -104,7 +104,7 @@ local function RestoreAfterDelay()
 	Turn(r_gun, x_axis, 0, math.rad(500))
 	Turn(l_gun, x_axis, 0, math.rad(500))
 	
-	--Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushResistant", false)
+	Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushResistant", false)
 end
 
 function script.AimFromWeapon()
@@ -128,7 +128,7 @@ function script.AimWeapon(num, heading, pitch)
 		return false
 	end
 	StartThread(RestoreAfterDelay)
-	--Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushResistant", true)
+	Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushResistant", true)
 
 	Turn(head, y_axis, heading, math.rad(800))
 	Turn(l_gun, x_axis, -pitch, math.rad(800))
