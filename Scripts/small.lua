@@ -17,10 +17,10 @@ local smokePiece = {head}
 -- signals
 local SIG_WALK = 1
 local SIG_AIM = 2
-local SIG_RESTORE = 4
 
 -- variables
 local gun_1
+local busyTime = false
 
 local function Step(front, back)
 	Move(back.shin, z_axis, 1.5, 7) --down
@@ -66,6 +66,8 @@ function script.Create()
 	
 	Turn(rightLeg.foot, x_axis, math.rad(30))
 	Turn(leftLeg.foot, x_axis, math.rad(30))
+	
+	Spring.SetUnitMass(unitID, 10)
 end
 
 local function Stopping()
@@ -95,9 +97,12 @@ function script.StopMoving()
 end
 
 local function RestoreAfterDelay()
-	Signal(SIG_RESTORE)
-	SetSignalMask(SIG_RESTORE)
-	Sleep(100)
+	Spring.SetUnitMass(unitID, 1000000)
+	Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushResistant", true)
+	while busyTime > 0 do
+		busyTime = busyTime - 1
+		Sleep(100)
+	end
 	Spin(r_gun_barr, z_axis, 0, math.rad(40))
 	Spin(l_gun_barr, z_axis, 0, math.rad(40))
 	Turn(head, y_axis, 0, math.rad(500))
@@ -105,6 +110,8 @@ local function RestoreAfterDelay()
 	Turn(l_gun, x_axis, 0, math.rad(500))
 	
 	Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushResistant", false)
+	Spring.SetUnitMass(unitID, 10)
+	busyTime = false
 end
 
 function script.AimFromWeapon()
@@ -120,16 +127,19 @@ function script.QueryWeapon(num)
 end
 
 function script.AimWeapon(num, heading, pitch)
-	Signal(SIG_AIM)
-	SetSignalMask(SIG_AIM)
-	
 	local speed = select(4, Spring.GetUnitVelocity(unitID))
 	if speed > 0.05 then
 		return false
 	end
-	StartThread(RestoreAfterDelay)
-	Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushResistant", true)
-
+	if not busyTime then
+		busyTime = 1
+		StartThread(RestoreAfterDelay)
+	end
+	busyTime = math.min(2, busyTime + 1)
+	
+	Signal(SIG_AIM)
+	SetSignalMask(SIG_AIM)
+	
 	Turn(head, y_axis, heading, math.rad(800))
 	Turn(l_gun, x_axis, -pitch, math.rad(800))
 	Turn(r_gun, x_axis, -pitch, math.rad(800))

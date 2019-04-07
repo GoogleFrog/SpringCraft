@@ -39,7 +39,7 @@ unitDef = {
 
 	-- Movement defaults
 	maxReverseVelocity     = 0,
-	minCollisionSpeed      = 1,
+	minCollisionSpeed      = 0,
 	blocking               = true,
 	collide                = true,
 	turnInPlace            = true,

@@ -29,5 +29,10 @@ function gadget:UnitCreated(unitID, unitDefID, teamID)
 	--end
 end
 
+function gadget:UnitUnitCollision(colliderID, collideeID)
+	Spring.Utilities.UnitEcho(colliderID, "r")
+	Spring.Utilities.UnitEcho(collideeID, "e")
+end
+
 -------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------
