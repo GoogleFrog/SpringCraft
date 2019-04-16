@@ -32,7 +32,7 @@ unitDef = {
 	-- Movement
 	movementClass          = [[SMALL_UNIT]],
 	maxVelocity            = 3,
-	acceleration           = 3,
+	acceleration           = 2,
 	brakeRate              = 2,
 	turnRate               = 0.16*33750, -- 33750 is 180 degrees in 1 frame
 	moveState              = 0, -- Prevent movement while firing
