@@ -24,6 +24,7 @@ local SAFEWRAP = 0
 
 
 local HANDLER_DIR = 'LuaGadgets/'
+local LUARULE_DIR = 'LuaRules/'
 local GADGETS_DIR = Script.GetName():gsub('US$', '') .. '/Gadgets/'
 local LOG_SECTION = "" -- FIXME: "LuaRules" section is not registered anywhere
 
@@ -36,7 +37,7 @@ end
 
 VFS.Include(HANDLER_DIR .. 'setupdefs.lua', nil, VFSMODE)
 VFS.Include(HANDLER_DIR .. 'system.lua',    nil, VFSMODE)
-VFS.Include(HANDLER_DIR .. 'callins.lua',   nil, VFSMODE)
+VFS.Include(LUARULE_DIR .. 'callins.lua',   nil, VFSMODE)
 
 local actionHandler = VFS.Include(HANDLER_DIR .. 'actions.lua', nil, VFSMODE)
 
@@ -1325,18 +1326,37 @@ end
 
 function gadgetHandler:AllowWeaponTarget(attackerID, targetID, attackerWeaponNum, attackerWeaponDefID, defPriority)
 	local allowed = true
-	local priority = 1.0
+	local returnValue
+	
+	if targetID == -1 then
+		local unitID = attackerID
+		local aquireRange = defPriority
+		for _, g in ipairs(self.AllowUnitTargetRangeList) do
+			-- Send priority to each successive gadget.
+			local targetAllowed, newRange = g:AllowUnitTargetRange(unitID, aquireRange)
 
-	for _, g in r_ipairs(self.AllowWeaponTargetList) do
-		local targetAllowed, targetPriority = g:AllowWeaponTarget(attackerID, targetID, attackerWeaponNum, attackerWeaponDefID, defPriority)
+			if (not targetAllowed) then
+				allowed = false
+				break
+			end
+
+			aquireRange = newRange
+		end
+		return true, aquireRange
+	end
+	
+	local priority = defPriority
+	for _, g in ipairs(self.AllowWeaponTargetList) do
+		-- Send priority to each successive gadget.
+		local targetAllowed, targetPriority = g:AllowWeaponTarget(attackerID, targetID, attackerWeaponNum, attackerWeaponDefID, priority)
 
 		if (not targetAllowed) then
-			allowed = false; break
+			allowed = false
+			break
 		end
 
-		priority = math.max(priority, targetPriority)
+		priority = targetPriority
 	end
-
 	return allowed, priority
 end
 

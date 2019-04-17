@@ -35,10 +35,13 @@ local function UnpackInt3(str)
 	return ret
 end
 
+local leashRangeUnits = {}
+
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
 local modelRadii = {}
+local leashRangeDefs = {}
 for i = 1,#UnitDefs do
 	local ud = UnitDefs[i]
 	local midPosOffset = ud.customParams.midposoffset
@@ -55,6 +58,10 @@ for i = 1,#UnitDefs do
 	end
 	if modelRadius or modelHeight then
 		modelRadii[i] = true -- mark that we need to initialize this
+	end
+	
+	if ud.leash_range then
+		leashRangeDefs[i] = tonumber(ud.leash_range)
 	end
 end
 
@@ -108,11 +115,31 @@ function gadget:UnitCreated(unitID, unitDefID, teamID)
 			Spring.SetUnitWeaponState(unitID, weaponNum, "reaimTime", reaimTime)
 		end
 	end
+	
+	if leashRangeDefs[unitDefID] then
+		leashRangeDefs[unitID] = leashRangeDefs[unitDefID]
+	else
+		leashRangeDefs[unitID] = nil
+	end
+end
+
+function gadget:AllowUnitTargetRange(unitID, aquireRange)
+	return true, (unitID and leashRangeDefs[unitID]) or aquireRange
+end
+
+function gadget:AllowWeaponTarget(attackerID, targetID, attackerWeaponNum, attackerWeaponDefID, defPriority)
+	return true, defPriority
 end
 
 function gadget:Initialize()
 	for _, unitID in ipairs(Spring.GetAllUnits()) do
 		local unitDefID = Spring.GetUnitDefID(unitID)
 		gadget:UnitCreated(unitID, unitDefID)
+	end
+	
+	for weaponID,wd in pairs(WeaponDefs) do
+		if wd.customParams and wd.customParams.is_unit_weapon then
+			Script.SetWatchWeapon(weaponID, true)
+		end
 	end
 end
