@@ -50,7 +50,6 @@ unitDef = {
 	customParams           = {
 		turnaccel          = 0.16*33750,
 		modelradius        = 15,
-		leash_range        = 100,
 	},
 
 	weapons                = {
@@ -82,6 +81,7 @@ unitDef = {
 
 			customParams            = {
 				reaim_time = 1,
+				target_aquire_boost = 300,
 			},
 
 			damage                  = {

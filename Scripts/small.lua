@@ -68,6 +68,7 @@ function script.Create()
 	Turn(leftLeg.foot, x_axis, math.rad(30))
 	
 	Spring.SetUnitMass(unitID, 10)
+	Spring.SetUnitWeaponState(unitID, 1, "autoTargetRangeBoost", 200)
 end
 
 local function Stopping()

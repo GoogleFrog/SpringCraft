@@ -82,6 +82,7 @@ end
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 local reaimTimeDefs = {}
+local targetAquireBoost = {}
 
 for udID = 1, #UnitDefs do
 	local weapons = UnitDefs[udID].weapons
@@ -90,6 +91,10 @@ for udID = 1, #UnitDefs do
 		if wd and wd.customParams.reaim_time then
 			reaimTimeDefs[udID] = reaimTimeDefs[udID] or {}
 			reaimTimeDefs[udID][i] = tonumber(wd.customParams.reaim_time)
+		end
+		if wd and wd.customParams.target_aquire_boost then
+			targetAquireBoost[udID] = targetAquireBoost[udID] or {}
+			targetAquireBoost[udID][i] = tonumber(wd.customParams.target_aquire_boost)
 		end
 	end
 end
@@ -113,6 +118,12 @@ function gadget:UnitCreated(unitID, unitDefID, teamID)
 	if reaimTimeDefs[unitDefID] then
 		for weaponNum, reaimTime in pairs(reaimTimeDefs[unitDefID]) do
 			Spring.SetUnitWeaponState(unitID, weaponNum, "reaimTime", reaimTime)
+		end
+	end
+	
+	if targetAquireBoost[unitDefID] then
+		for weaponNum, aquireBoost in pairs(targetAquireBoost[unitDefID]) do
+			Spring.SetUnitWeaponState(unitID, weaponNum, "autoTargetRangeBoost", reaimTime)
 		end
 	end
 	

@@ -63,6 +63,43 @@ local queueFrontCommand = {
 	[CMD.GATHERWAIT] = true,
 }
 
+local DIRANGLE = {
+	{0.71,   0.71},
+	{0,  1},
+	{-0.71,  0.71},
+	{-1, 0},
+	{-0.71, -0.71},
+	{0, -1},
+	{0.71,  -0.71},
+	{1,  0},
+}
+
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+-- Commmands
+
+local moveRawCmdDesc = {
+	id      = CMD_RAW_MOVE,
+	type    = CMDTYPE.ICON_MAP,
+	name    = 'Move',
+	cursor  = 'Move', -- add with LuaUI?
+	action  = 'rawmove',
+	tooltip = 'Move: Order the unit to move to a position.',
+}
+
+local attackRawCmdDesc = {
+	id      = CMD_RAW_ATTACK,
+	type    = CMDTYPE.ICON_UNIT_OR_MAP,
+	name    = 'Attack',
+	cursor  = 'Attack', -- add with LuaUI?
+	action  = 'rawattack',
+	tooltip = 'Attack: Fire at a unit or move to a position, stoping to attack along the way.',
+}
+
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+-- Data
+
 local canMoveDefs = {}
 local canFlyDefs = {}
 local goalDist = {}
@@ -74,11 +111,41 @@ local stoppingRadiusIncrease = {}
 local stuckTravelOverride = {}
 local startMovingTime = {}
 
-local constructorBuildDistDefs = {}
-
 -- Check unit queues because perhaps CMD_RAW_MOVE is not the first command anymore
 local unitQueueCheckRequired = false
 local unitQueuesToCheck = {}
+
+local attackMoveUnit = {}
+
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+-- Configuration
+
+local TEST_MOVE_SPACING = 16
+local LAZY_TEST_MOVE_SPACING = 8
+local LAZY_SEARCH_DISTANCE = 450
+local BLOCK_RELAX_DISTANCE = 250
+local STUCK_TRAVEL = 25
+local STUCK_MOVE_RANGE = 140
+local GIVE_UP_STUCK_DIST_SQ = 250^2
+local STOP_STOPPING_RADIUS = 10000000
+local RAW_CHECK_SPACING = 500
+local MAX_COMM_STOP_RADIUS = 400^2
+local COMMON_STOP_RADIUS_ACTIVE_DIST_SQ = 120^2 -- Commands shorter than this do not activate common stop radius.
+
+local CONSTRUCTOR_UPDATE_RATE = 30
+local CONSTRUCTOR_TIMEOUT_RATE = 2
+
+local MAX_FORMATION_RADIUS = 65
+local FORMATION_SHRINK = 0.97
+
+local STOP_RADIUS_INC_FACTOR = 1.2
+local STOP_DIST_FACTOR = 1.5
+
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+-- Unit Configuration
+local constructorBuildDistDefs = {}
 
 for i = 1, #UnitDefs do
 	local ud = UnitDefs[i]
@@ -88,7 +155,7 @@ for i = 1, #UnitDefs do
 		end
 
 		canMoveDefs[i] = true
-		local stopDist = ud.xsize*8*1.4
+		local stopDist = ud.xsize*8*STOP_DIST_FACTOR
 		local loneStopDist = 16
 		local turningDiameter = 2*(ud.speed*2195/(ud.turnRate * 2 * math.pi))
 		if turningDiameter > 20 then
@@ -123,7 +190,7 @@ for i = 1, #UnitDefs do
 		if stopDist and not goalDist[i] then
 			goalDist[i] = loneStopDist
 		end
-		stoppingRadiusIncrease[i] = ud.xsize*250
+		stoppingRadiusIncrease[i] = ud.xsize*250*STOP_RADIUS_INC_FACTOR
 	end
 end
 
@@ -133,48 +200,6 @@ end
 --	oldSetMoveGoal(unitID, x, y, z, radius, speed, raw)
 --	Spring.MarkerAddPoint(x, y, z, ((raw and "r") or "") .. (radius or 0))
 --end
-
-----------------------------------------------------------------------------------------------
-----------------------------------------------------------------------------------------------
--- Configuration
-
-local moveRawCmdDesc = {
-	id      = CMD_RAW_MOVE,
-	type    = CMDTYPE.ICON_MAP,
-	name    = 'Move',
-	cursor  = 'Move', -- add with LuaUI?
-	action  = 'rawmove',
-	tooltip = 'Move: Order the unit to move to a position.',
-}
-
-local TEST_MOVE_SPACING = 16
-local LAZY_TEST_MOVE_SPACING = 8
-local LAZY_SEARCH_DISTANCE = 450
-local BLOCK_RELAX_DISTANCE = 250
-local STUCK_TRAVEL = 25
-local STUCK_MOVE_RANGE = 140
-local GIVE_UP_STUCK_DIST_SQ = 250^2
-local STOP_STOPPING_RADIUS = 10000000
-local RAW_CHECK_SPACING = 500
-local MAX_COMM_STOP_RADIUS = 400^2
-local COMMON_STOP_RADIUS_ACTIVE_DIST_SQ = 120^2 -- Commands shorter than this do not activate common stop radius.
-
-local CONSTRUCTOR_UPDATE_RATE = 30
-local CONSTRUCTOR_TIMEOUT_RATE = 2
-
-local MAX_FORMATION_RADIUS = 60
-local FORMATION_SHRINK = 0.95
-
-local DIRANGLE = {
-	{0.71,   0.71},
-	{0,  1},
-	{-0.71,  0.71},
-	{-1, 0},
-	{-0.71, -0.71},
-	{0, -1},
-	{0.71,  -0.71},
-	{1,  0},
-}
 
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
@@ -377,20 +402,15 @@ end
 ----------------------------------------------------------------------------------------------
 -- Raw Move Handling
 
-local function StopRawMoveUnit(unitID, stopNonRaw)
+local function StopUnit(unitID, stopNonRaw)
 	if not rawMoveUnit[unitID] then
 		return
 	end
 	if stopNonRaw or not rawMoveUnit[unitID].switchedFromRaw then
-		if Spring.ClearUnitGoal then
-			Spring.ClearUnitGoal(unitID)
-		else
-			local x, y, z = spGetUnitPosition(unitID)
-			Spring.SetUnitMoveGoal(unitID, x, y, z, STOP_STOPPING_RADIUS)
-		end
+		Spring.ClearUnitGoal(unitID)
 	end
 	rawMoveUnit[unitID] = nil
-	--Spring.Echo("StopRawMoveUnit", math.random())
+	--Spring.Echo("StopUnit", math.random())
 end
 
 local function HandleRawMove(unitID, unitDefID, cmdParams)
@@ -478,7 +498,7 @@ local function HandleRawMove(unitID, unitDefID, cmdParams)
 				commonStopRadius[unitData.commandString] = MAX_COMM_STOP_RADIUS
 			end
 		end
-		StopRawMoveUnit(unitID, true)
+		StopUnit(unitID, true)
 		return true, true
 	end
 
@@ -508,7 +528,7 @@ local function HandleRawMove(unitID, unitDefID, cmdParams)
 		if travelled < (stuckTravelOverride[unitDefID] or STUCK_TRAVEL) then
 			unitData.stuckCheckTimer = math.floor(math.random()*6) + 5
 			if distSq < GIVE_UP_STUCK_DIST_SQ then
-				StopRawMoveUnit(unitID, true)
+				StopUnit(unitID, true)
 				return true, true
 			else
 				local vx = math.random()*2*STUCK_MOVE_RANGE - STUCK_MOVE_RANGE
@@ -579,11 +599,44 @@ end
 
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
+-- Attack Handling
+
+local function CheckAttackMove(unitID)
+	local tarType, isUser, targetID = Spring.GetUnitWeaponTarget(unitID, 1)
+	if targetID then
+		--Spring.Utilities.UnitEcho(targetID, "t")
+		if Spring.GetUnitWeaponTestRange(unitID, 1, targetID) then
+			StopUnit(unitID, true)
+			return true
+		end
+	end
+	return false
+end
+
+local function CheckAllAttackMoveUnits()
+	for unitID, _ in pairs(attackMoveUnit) do
+		local cmdID, _, cmdTag, cmdParam_1, cmdParam_2, cmdParam_3 = Spring.GetUnitCurrentCommand(unitID)
+		if cmdID == CMD_RAW_ATTACK and cmdParam_3 then
+			CheckAttackMove(unitID)
+		else
+			attackMoveUnit[unitID] = nil
+		end
+	end
+end
+
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
 -- Command Handling
 
 function gadget:CommandFallback(unitID, unitDefID, teamID, cmdID, cmdParams, cmdOptions) -- Only calls for custom commands
-	if not (cmdID == CMD_RAW_MOVE or cmdID == CMD_RAW_BUILD) then
+	if not (cmdID == CMD_RAW_MOVE or (cmdID == CMD_RAW_ATTACK and #cmdParams > 1) or cmdID == CMD_RAW_BUILD) then
 		return false
+	end
+	if cmdID == CMD_RAW_ATTACK then
+		attackMoveUnit[unitID] = true
+		if CheckAttackMove(unitID) then
+			return true, false
+		end
 	end
 	if delayedInit[unitID] then
 		if (delayedInit[unitID] == (cmdParams[1] or 0) .. "_" .. (cmdParams[3] or 0)) then
@@ -601,7 +654,7 @@ end
 local function CheckUnitQueues()
 	for unitID,_ in pairs(unitQueuesToCheck) do
 		if Spring.GetUnitCurrentCommand(unitID) ~= CMD_RAW_MOVE then
-			StopRawMoveUnit(unitID)
+			StopUnit(unitID)
 		end
 		unitQueuesToCheck[unitID] = nil
 	end
@@ -610,7 +663,7 @@ end
 function gadget:UnitCmdDone(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOptions, cmdTag)
 	if cmdID == CMD_STOP then
 		-- Handling for shift clicking on commands to remove.
-		StopRawMoveUnit(unitID)
+		StopUnit(unitID)
 	end
 end
 
@@ -628,9 +681,9 @@ function gadget:AllowCommand(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdO
 
 	if canMoveDefs[unitDefID] then
 		if cmdID == CMD_STOP or ((not cmdOptions.shift) and (cmdID < 0 or stopCommand[cmdID])) then
-			StopRawMoveUnit(unitID)
+			StopUnit(unitID)
 		elseif cmdID == CMD_INSERT and (cmdParams[1] == 0 or not cmdOptions.alt) then
-			StopRawMoveUnit(unitID)
+			StopUnit(unitID)
 		elseif queueFrontCommand[cmdID] then
 			unitQueueCheckRequired = true
 			unitQueuesToCheck[unitID] = true
@@ -710,7 +763,7 @@ local function CheckConstructorBuild(unitID)
 	if cmdID == CMD_RAW_BUILD and cp_3 then
 		if (not cx) or math.abs(cx - cp_1) > 3 or math.abs(cz - cp_3) > 3 then
 			Spring.GiveOrderToUnit(unitID, CMD_REMOVE, {cmdTag}, 0)
-			StopRawMoveUnit(unitID, true)
+			StopUnit(unitID, true)
 		end
 		return
 	end
@@ -877,14 +930,25 @@ function gadget:Initialize()
 	end
 
 	GG.AddRawMoveUnit = AddRawMoveUnit
-	GG.StopRawMoveUnit = StopRawMoveUnit
+	GG.StopUnit = StopUnit
 	GG.RawMove_IsPathFree = RawMove_IsPathFree
 	GG.WaitWaitMoveUnit = WaitWaitMoveUnit
+end
+
+local function RemoveCommand(unitID, cmdID)
+	local descID = Spring.FindUnitCmdDesc(unitID, cmdID)
+	if descID then
+		Spring.RemoveUnitCmdDesc(unitID, descID)
+	end
 end
 
 function gadget:UnitCreated(unitID, unitDefID, teamID)
 	if (canMoveDefs[unitDefID]) then
 		spInsertUnitCmdDesc(unitID, moveRawCmdDesc)
+		spInsertUnitCmdDesc(unitID, attackRawCmdDesc)
+		RemoveCommand(unitID, CMD.MOVE)
+		RemoveCommand(unitID, CMD.ATTACK)
+		RemoveCommand(unitID, CMD.FIGHT)
 	end
 	if constructorBuildDistDefs[unitDefID] and not constructorByID[unitID] then
 		AddConstructor(unitID, constructorBuildDistDefs[unitDefID])
@@ -910,12 +974,16 @@ function gadget:GameFrame(n)
 		end
 		handleInGameFrame = nil
 	end
+	
+	CheckAllAttackMoveUnits()
+	
 	if needGlobalWaitWait then
 		for _, unitID in ipairs(Spring.GetAllUnits()) do
 			WaitWaitMoveUnit(unitID)
 		end
 		needGlobalWaitWait = false
 	end
+	
 	UpdateConstructors(n)
 	UpdateMoveReplacement()
 	if n%247 == 4 then
@@ -953,6 +1021,8 @@ else --UNSYNCED--
 function gadget:DefaultCommand(targetType, targetID)
 	if not targetID then
 		return CMD_RAW_MOVE
+	else
+		return CMD_RAW_ATTACK
 	end
 end
 
@@ -960,8 +1030,12 @@ function gadget:Initialize()
 	--Note: IMO we must *allow* LUAUI to draw this command. We already used to seeing skirm command, and it is informative to players.
 	--Also, its informative to widget coder and allow player to decide when to manually micro units (like seeing unit stuck on cliff with jink command)
 	gadgetHandler:RegisterCMDID(CMD_RAW_MOVE)
-	Spring.SetCustomCommandDrawData(CMD_RAW_MOVE, "RawMove", {0.5, 1.0, 0.5, 0.7}) -- "" mean there's no MOVE cursor if the command is drawn.
+	Spring.SetCustomCommandDrawData(CMD_RAW_MOVE, "RawMove", {0.5, 1.0, 0.5, 0.7})
 	Spring.AssignMouseCursor("RawMove", "cursormove", true, true)
+	
+	gadgetHandler:RegisterCMDID(CMD_RAW_ATTACK)
+	Spring.SetCustomCommandDrawData(CMD_RAW_ATTACK, "RawAttack", {1.0, 0.2, 0.2, 0.7})
+	Spring.AssignMouseCursor("RawAttack", "cursorattack", true, true)
 end
 
 end

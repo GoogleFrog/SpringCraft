@@ -81,6 +81,7 @@ unitDef = {
 
 			customParams            = {
 				reaim_time = 1,
+				target_aquire_boost = 100,
 			},
 
 			damage                  = {
