@@ -64,7 +64,7 @@ unitDef = {
 
 		WEAPON = {
 			name                    = [[Laser Blaster]],
-			areaOfEffect            = 8,
+			beamTime                = 0.03,
 			coreThickness           = 0.5,
 			craterBoost             = 0,
 			craterMult              = 0,
@@ -82,30 +82,31 @@ unitDef = {
 
 			customParams            = {
 				reaim_time = 1,
-				target_aquire_boost = 300,
+				target_aquire_boost = 200,
 			},
 
 			damage                  = {
 				default = 0.1,
 			},
 
-			duration                = 0.02,
+			duration                = 0.03,
 			fireStarter             = 50,
 			heightMod               = 1,
+			hardStop                = true,
 			impactOnly              = true,
 			impulseBoost            = 0,
 			impulseFactor           = 0.4,
 			interceptedByShieldType = 1,
 			noSelfDamage            = true,
-			range                   = 60,
-			reloadtime              = 0.1,
+			range                   = 45,
+			reloadtime              = 1.5,
 			rgbColor                = [[1 0 0]],
 			soundTrigger            = true,
 			targetBorder            = 1,
 			thickness               = 2.55,
 			tolerance               = 10000,
 			turret                  = true,
-			weaponType              = [[LaserCannon]],
+			weaponType              = [[BeamLaser]],
 			weaponVelocity          = 880,
 		},
 	},

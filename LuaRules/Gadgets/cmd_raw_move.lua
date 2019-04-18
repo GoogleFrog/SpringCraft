@@ -429,7 +429,7 @@ end
 -- Raw Move Handling
 
 local function StopUnit(unitID, stopNonRaw)
-	if not rawMoveUnit[unitID] then
+	if not (stopNonRaw or rawMoveUnit[unitID]) then
 		return
 	end
 	if stopNonRaw or not rawMoveUnit[unitID].switchedFromRaw then
@@ -636,7 +636,14 @@ local function CheckAttackMove(unitID, slowUpdate)
 			StopUnit(unitID, true)
 		elseif slowUpdate then
 			local mx, my, mz = Spring.GetUnitPosition(targetID)
-			Spring.SetUnitMoveGoal(unitID, mx, my, mz)
+			
+			-- Issue move goal to move behind enemy unit.
+			local ux, uy, uz = Spring.GetUnitPosition(unitID)
+			local dx, dz = mx - ux, mz - uz
+			local dist = math.sqrt(dx*dx + dz*dz)
+			local scale = (dist + 32)/dist
+			
+			Spring.SetUnitMoveGoal(unitID, ux + scale*dx, my, uz + scale*dz, 8)
 		end
 		GG.SetPushResistant(unitID, inRange)
 		SetRehandlingRequired(unitID)
