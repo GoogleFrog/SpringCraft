@@ -7,7 +7,7 @@ unitDef = {
 	canGuard               = true,
 	canMove                = true,
 	canPatrol              = true,
-	canAttack              = true,
+	canAttack              = false,
 	sightDistance          = 500,
 	idleAutoHeal           = 0,
 	idleTime               = 1800,
@@ -46,6 +46,7 @@ unitDef = {
 	turnInPlaceSpeedLimit  = 10,
 	turnInPlaceAngleLimit  = 0,
 	pushResistant          = false, -- Sometimes set to true in LUS
+	movestate              = 0,
 	
 	customParams           = {
 		turnaccel          = 0.16*33750,

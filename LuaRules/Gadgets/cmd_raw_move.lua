@@ -142,6 +142,9 @@ local FORMATION_SHRINK = 0.97
 local STOP_RADIUS_INC_FACTOR = 1.2
 local STOP_DIST_FACTOR = 1.5
 
+local SLOW_UPDATE_RATE = 15
+local ATTACK_MOVE_CHECK_RATE = 2
+
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
 -- Unit Configuration
@@ -227,6 +230,8 @@ local fastConstructorUpdate
 local delayedInit = {}
 local handleInGameFrame
 
+local pushResistantUnit = {}
+
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
 -- Utilities
@@ -299,6 +304,18 @@ local function ResetUnitData(unitData)
 	unitData.xOff = nil
 	unitData.zOff = nil
 	unitData.initComplete = nil
+end
+
+local function SetRehandlingRequired(unitID)
+	local unitData = rawMoveUnit[unitID]
+	if not unitData then
+		return
+	end
+	unitData.switchedFromRaw = nil
+	unitData.nextTestTime = nil
+	unitData.commandHandled = nil
+	unitData.stuckCheckTimer = nil
+	unitData.handlingWaitTime = nil
 end
 
 local function ResetToInitUnitData(unitData)
@@ -396,6 +413,15 @@ local function ProcessUnitCommandOffets(unitDefID, cmdStr, cx, cz)
 			rawMoveUnit[unitID].toinit_cmdStrOffsetZ = zOff[i]
 		end
 	end
+end
+
+function GG.SetPushResistant(unitID, newState)
+	if pushResistantUnit[unitID] == newState then
+		return
+	end
+	pushResistantUnit[unitID] = newState
+	--Spring.SetUnitMass(unitID, (newState and 1000000) or 10)
+	Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushResistant", newState)
 end
 
 ----------------------------------------------------------------------------------------------
@@ -601,23 +627,29 @@ end
 ----------------------------------------------------------------------------------------------
 -- Attack Handling
 
-local function CheckAttackMove(unitID)
+local function CheckAttackMove(unitID, slowUpdate)
 	local tarType, isUser, targetID = Spring.GetUnitWeaponTarget(unitID, 1)
 	if targetID then
 		--Spring.Utilities.UnitEcho(targetID, "t")
-		if Spring.GetUnitWeaponTestRange(unitID, 1, targetID) then
+		local inRange = Spring.GetUnitWeaponTestRange(unitID, 1, targetID)
+		if inRange then
 			StopUnit(unitID, true)
-			return true
+		elseif slowUpdate then
+			local mx, my, mz = Spring.GetUnitPosition(targetID)
+			Spring.SetUnitMoveGoal(unitID, mx, my, mz)
 		end
+		GG.SetPushResistant(unitID, inRange)
+		SetRehandlingRequired(unitID)
+		return true
 	end
 	return false
 end
 
-local function CheckAllAttackMoveUnits()
+local function CheckAllAttackMoveUnits(n)
 	for unitID, _ in pairs(attackMoveUnit) do
 		local cmdID, _, cmdTag, cmdParam_1, cmdParam_2, cmdParam_3 = Spring.GetUnitCurrentCommand(unitID)
 		if cmdID == CMD_RAW_ATTACK and cmdParam_3 then
-			CheckAttackMove(unitID)
+			CheckAttackMove(unitID, (n + unitID)%SLOW_UPDATE_RATE < ATTACK_MOVE_CHECK_RATE)
 		else
 			attackMoveUnit[unitID] = nil
 		end
@@ -638,6 +670,9 @@ function gadget:CommandFallback(unitID, unitDefID, teamID, cmdID, cmdParams, cmd
 			return true, false
 		end
 	end
+	
+	GG.SetPushResistant(unitID, false)
+	
 	if delayedInit[unitID] then
 		if (delayedInit[unitID] == (cmdParams[1] or 0) .. "_" .. (cmdParams[3] or 0)) then
 			handleInGameFrame = handleInGameFrame or {}
@@ -958,6 +993,7 @@ end
 function gadget:UnitDestroyed(unitID, unitDefID, teamID)
 	if unitID then
 		rawMoveUnit[unitID] = nil
+		pushResistantUnit[unitID] = nil
 		if unitDefID and constructorBuildDistDefs[unitDefID] and constructorByID[unitID] then
 			RemoveConstructor(unitID)
 		end
@@ -975,7 +1011,9 @@ function gadget:GameFrame(n)
 		handleInGameFrame = nil
 	end
 	
-	CheckAllAttackMoveUnits()
+	if n%ATTACK_MOVE_CHECK_RATE == 0 then
+		CheckAllAttackMoveUnits(n)
+	end
 	
 	if needGlobalWaitWait then
 		for _, unitID in ipairs(Spring.GetAllUnits()) do

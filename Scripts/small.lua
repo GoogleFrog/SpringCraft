@@ -98,8 +98,7 @@ function script.StopMoving()
 end
 
 local function RestoreAfterDelay()
-	Spring.SetUnitMass(unitID, 1000000)
-	Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushResistant", true)
+	GG.SetPushResistant(unitID, true)
 	while busyTime > 0 do
 		busyTime = busyTime - 1
 		Sleep(100)
@@ -110,8 +109,7 @@ local function RestoreAfterDelay()
 	Turn(r_gun, x_axis, 0, math.rad(500))
 	Turn(l_gun, x_axis, 0, math.rad(500))
 	
-	Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushResistant", false)
-	Spring.SetUnitMass(unitID, 10)
+	GG.SetPushResistant(unitID, false)
 	busyTime = false
 end
 
@@ -130,14 +128,9 @@ end
 
 function script.AimWeapon(num, heading, pitch)
 	local speed = select(4, Spring.GetUnitVelocity(unitID))
-	if speed > 0.05 then
+	if speed > 1 then
 		return false
 	end
-	if not busyTime then
-		busyTime = 1
-		StartThread(RestoreAfterDelay)
-	end
-	busyTime = math.min(2, busyTime + 1)
 	
 	Signal(SIG_AIM)
 	SetSignalMask(SIG_AIM)
@@ -160,6 +153,12 @@ function script.FireWeapon(num)
 		EmitSfx(l_gun_barr, GG.Script.UNIT_SFX1)
 		Spin(l_gun_barr, z_axis, math.rad(1000), math.rad(50))
 	end
+	
+	if not busyTime then
+		busyTime = 1
+		StartThread(RestoreAfterDelay)
+	end
+	busyTime = math.min(2, busyTime + 1)
 end
 
 function script.Killed(recentDamage, maxHealth)
