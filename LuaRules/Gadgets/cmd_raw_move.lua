@@ -88,7 +88,7 @@ for i = 1, #UnitDefs do
 		end
 
 		canMoveDefs[i] = true
-		local stopDist = ud.xsize*8
+		local stopDist = ud.xsize*8*1.4
 		local loneStopDist = 16
 		local turningDiameter = 2*(ud.speed*2195/(ud.turnRate * 2 * math.pi))
 		if turningDiameter > 20 then
@@ -296,6 +296,7 @@ local function HandleRawMove(unitID, unitDefID, cmdParams)
 	if not rawMoveUnit[unitID] then
 		rawMoveUnit[unitID] = {}
 	end
+	
 	local unitData = rawMoveUnit[unitID]
 	if not (unitData.cx == mx and unitData.cz == mz) then
 		ResetUnitData(unitData)
@@ -493,6 +494,7 @@ function gadget:AllowCommand(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdO
 			return false
 		end
 	end
+
 	return true
 end
 
