@@ -162,6 +162,20 @@ local COMMON_STOP_RADIUS_ACTIVE_DIST_SQ = 120^2 -- Commands shorter than this do
 local CONSTRUCTOR_UPDATE_RATE = 30
 local CONSTRUCTOR_TIMEOUT_RATE = 2
 
+local MAX_FORMATION_RADIUS = 60
+local FORMATION_SHRINK = 0.95
+
+local DIRANGLE = {
+	{0.71,   0.71},
+	{0,  1},
+	{-0.71,  0.71},
+	{-1, 0},
+	{-0.71, -0.71},
+	{0, -1},
+	{0.71,  -0.71},
+	{1,  0},
+}
+
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
 -- Variables
@@ -172,6 +186,7 @@ local oldCommandStoppingRadius = {}
 local commandCount = {}
 local oldCommandCount = {}
 local fromFactory = {}
+local unitsWithCommand = {}
 
 local constructors = {}
 local constructorBuildDist = {}
@@ -183,6 +198,9 @@ local alreadyResetConstructors = false
 
 local moveCommandReplacementUnits
 local fastConstructorUpdate
+
+local delayedInit = {}
+local handleInGameFrame
 
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
@@ -253,6 +271,106 @@ local function ResetUnitData(unitData)
 	unitData.nextRawCheckDistSq = nil
 	unitData.doingRawMove = nil
 	unitData.possiblyTurning = nil
+	unitData.xOff = nil
+	unitData.zOff = nil
+	unitData.initComplete = nil
+end
+
+local function ResetToInitUnitData(unitData)
+	unitData.toinit_cmdStr = nil
+	unitData.toinit_cmdStrOffsetX = nil
+	unitData.toinit_cmdStrOffsetZ = nil
+end
+
+local function ProcessUnitCommandOffets(unitDefID, cmdStr, cx, cz)
+	local unitList = unitsWithCommand[cmdStr]
+	unitsWithCommand[cmdStr] = nil
+
+	-- Check whether all this is necessary
+	if (not unitList) or (#unitList <= 1) or (not Spring.TestMoveOrder(unitDefID, cx, 0, cz)) then
+		return
+	end
+	
+	-- Find average unit position and offset
+	local xOff = {}
+	local zOff = {}
+	local avX, avZ = 0, 0
+	local count = 0
+	for i = 1, #unitList do
+		local unitID = unitList[i]
+		local x, _, z = spGetUnitPosition(unitID)
+		if x then
+			xOff[i] = x
+			zOff[i] = z
+			avX, avZ = avX + x, avZ + z
+			count = count + 1
+			--Spring.MarkerAddPoint(x, 0, z, i)
+		end
+	end
+	
+	if count <= 1 then
+		return
+	end
+	avX, avZ = avX/count, avZ/count
+	--Spring.MarkerAddPoint(avX, 0, avZ, "av")
+	
+	local dist = {}
+	local maxUnitDist
+	local avDist = 0
+	for i = 1, #unitList do
+		if xOff[i] then
+			xOff[i] = xOff[i] - avX
+			zOff[i] = zOff[i] - avZ
+			dist[i] = math.sqrt(xOff[i]*xOff[i] + zOff[i]*zOff[i])
+			avDist = avDist + dist[i]
+			if (not maxUnitDist) or (maxUnitDist < dist[i]) then
+				maxUnitDist = dist[i]
+			end
+		end
+	end
+	avDist = avDist/count
+	
+	if not maxUnitDist then
+		return
+	end
+	
+	-- Calculate the space available in the target location
+	local targetRadius
+	local maxFormRadius = math.min(maxUnitDist, MAX_FORMATION_RADIUS)
+	local step = MAX_FORMATION_RADIUS/2
+	for r = step, maxFormRadius, step do
+		for dir = 1, 8 do
+			if not Spring.TestMoveOrder(unitDefID, cx + r*DIRANGLE[dir][1], 0, cz + r*DIRANGLE[dir][2]) then
+				targetRadius = r - step
+				break
+			end
+		end
+		if targetRadius then
+			break
+		end
+	end
+	targetRadius = targetRadius or maxFormRadius
+	
+	--Spring.Echo("avDist", avDist, "targetRadius", targetRadius, "maxUnitDist", maxUnitDist)
+	if avDist > targetRadius then
+		targetRadius = targetRadius*targetRadius/avDist
+	end
+	
+	-- Calculate the offset for each unit
+	for i = 1, #unitList do
+		if xOff[i] then
+			xOff[i] = xOff[i]*FORMATION_SHRINK*targetRadius/maxUnitDist
+			zOff[i] = zOff[i]*FORMATION_SHRINK*targetRadius/maxUnitDist
+			
+			--Spring.MarkerAddPoint(xOff[i] + cx, 0, zOff[i] + cz, i)
+			
+			local unitID = unitList[i]
+			rawMoveUnit[unitID] = rawMoveUnit[unitID] or {}
+			rawMoveUnit[unitID].toinit_cmdStr = cmdStr
+			rawMoveUnit[unitID].toinit_cmdStrOffsetX = xOff[i]
+			rawMoveUnit[unitID].toinit_cmdStrOffsetZ = zOff[i]
+		end
+	end
 end
 
 ----------------------------------------------------------------------------------------------
@@ -279,15 +397,12 @@ local function HandleRawMove(unitID, unitDefID, cmdParams)
 	if spMoveCtrlGetTag(unitID) then
 		return true, false
 	end
-
 	if #cmdParams < 3 then
 		return true, true
 	end
 
 	local mx, my, mz = cmdParams[1], cmdParams[2], cmdParams[3]
-	if mx < 0 or mx >= mapSizeX
-	or mz < 0 or mz >= mapSizeZ then
-		-- could do `and not GG.AllowOffMapOrders` for mission editor?
+	if mx < 0 or mx >= mapSizeX or mz < 0 or mz >= mapSizeZ then
 		return true, true
 	end
 
@@ -308,21 +423,46 @@ local function HandleRawMove(unitID, unitDefID, cmdParams)
 		end
 		return true, false
 	end
+	
+	if not unitData.cx then
+		local cx, cz = cmdParams[1], cmdParams[3]
+		unitData.cx, unitData.cz = cx, cz
+		unitData.commandString = cx .. "_" .. cz
+		commandCount[unitData.commandString] = (commandCount[unitData.commandString] or 0) + 1
+	end
+	
+	if unitData.commandString then
+		if not commandCount[unitData.commandString] then
+			commandCount[unitData.commandString] = oldCommandCount[unitData.commandString] or 1
+		end
+		if unitsWithCommand[unitData.commandString] then
+			ProcessUnitCommandOffets(unitDefID, unitData.commandString, mx, mz)
+		end
+	end
+	
+	if unitData.toinit_cmdStr then
+		if unitData.toinit_cmdStr == unitData.commandString then
+			if unitData.toinit_cmdStrOffsetX then
+				unitData.xOff = unitData.toinit_cmdStrOffsetX
+				unitData.zOff = unitData.toinit_cmdStrOffsetZ
+			end
+			ResetToInitUnitData(unitData)
+		end
+	end
+
+	mx = mx + (unitData.xOff or 0)
+	mz = mz + (unitData.zOff or 0)
 
 	local x, y, z = spGetUnitPosition(unitID)
 	local distSq = (x - (unitData.mx or mx))^2 + (z - (unitData.mz or mz))^2
 
-	if not unitData.cx then
-		unitData.cx, unitData.cz = mx, mz
-		unitData.commandString = mx .. "_" .. mz
-		commandCount[unitData.commandString] = (commandCount[unitData.commandString] or 0) + 1
+	if not unitData.initComplete then
 		unitData.preventGoalClumping = (not goalDistOverride) and (distSq > COMMON_STOP_RADIUS_ACTIVE_DIST_SQ) and not select(4, Spring.GetUnitStates(unitID, false, true))
+		unitData.initComplete = true
 	end
+
 	if unitData.preventGoalClumping and unitData.commandString and not commonStopRadius[unitData.commandString] then
 		commonStopRadius[unitData.commandString] = oldCommandStoppingRadius[unitData.commandString] or 0
-	end
-	if unitData.commandString and not commandCount[unitData.commandString] then
-		commandCount[unitData.commandString] = oldCommandCount[unitData.commandString] or 1
 	end
 
 	local alone = (commandCount[unitData.commandString] <= 1)
@@ -445,6 +585,15 @@ function gadget:CommandFallback(unitID, unitDefID, teamID, cmdID, cmdParams, cmd
 	if not (cmdID == CMD_RAW_MOVE or cmdID == CMD_RAW_BUILD) then
 		return false
 	end
+	if delayedInit[unitID] then
+		if (delayedInit[unitID] == (cmdParams[1] or 0) .. "_" .. (cmdParams[3] or 0)) then
+			handleInGameFrame = handleInGameFrame or {}
+			handleInGameFrame[#handleInGameFrame + 1] = {unitID, unitDefID, cmdParams}
+			delayedInit[unitID] = nil
+			return true, false
+		end
+		delayedInit[unitID] = nil
+	end
 	local cmdUsed, cmdRemove = HandleRawMove(unitID, unitDefID, cmdParams)
 	return cmdUsed, cmdRemove
 end
@@ -495,6 +644,12 @@ function gadget:AllowCommand(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdO
 		end
 	end
 
+	if cmdID == CMD_RAW_MOVE and cmdParams[3] then
+		local cmdStr = cmdParams[1] .. "_" .. cmdParams[3]
+		delayedInit[unitID] = cmdStr
+		unitsWithCommand[cmdStr] = unitsWithCommand[cmdStr] or {}
+		unitsWithCommand[cmdStr][#unitsWithCommand[cmdStr] + 1] = unitID
+	end
 	return true
 end
 
@@ -747,6 +902,14 @@ end
 
 local needGlobalWaitWait = false
 function gadget:GameFrame(n)
+	if handleInGameFrame then
+		for i = 1, #handleInGameFrame do
+			if Spring.ValidUnitID(handleInGameFrame[i][1]) then
+				HandleRawMove(handleInGameFrame[i][1], handleInGameFrame[i][2], handleInGameFrame[i][3])
+			end
+		end
+		handleInGameFrame = nil
+	end
 	if needGlobalWaitWait then
 		for _, unitID in ipairs(Spring.GetAllUnits()) do
 			WaitWaitMoveUnit(unitID)
