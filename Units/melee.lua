@@ -21,8 +21,8 @@ unitDef = {
 	
 	-- Size
 	collisionVolumeOffsets = [[0 0 0]],
-	collisionVolumeScales  = [[22 30 22]],
-	collisionVolumeType    = [[CylY]],
+	collisionVolumeScales  = [[25 25 25]],
+	collisionVolumeType    = [[sphere]],
 	objectName             = [[mbot.s3o]],
 	script                 = [[small.lua]],
 	footprintX             = 2,
@@ -35,7 +35,7 @@ unitDef = {
 	acceleration           = 2,
 	brakeRate              = 2,
 	turnRate               = 0.16*33750, -- 33750 is 180 degrees in 1 frame
-	moveState              = 0, -- Prevent movement while firing
+	stopToAttack           = true,
 
 	-- Movement defaults
 	maxReverseVelocity     = 0,
@@ -50,7 +50,7 @@ unitDef = {
 	customParams           = {
 		turnaccel          = 0.16*33750,
 		modelradius        = 15,
-		leash_range        = 120,
+		leash_range        = 100,
 	},
 
 	weapons                = {
@@ -96,7 +96,7 @@ unitDef = {
 			impulseFactor           = 0.4,
 			interceptedByShieldType = 1,
 			noSelfDamage            = true,
-			range                   = 50,
+			range                   = 60,
 			reloadtime              = 0.1,
 			rgbColor                = [[1 0 0]],
 			soundTrigger            = true,

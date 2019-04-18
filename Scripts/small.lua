@@ -119,11 +119,12 @@ function script.AimFromWeapon()
 end
 
 function script.QueryWeapon(num)
-	if gun_1 then
-		return r_gun_barr
-	else
-		return l_gun_barr
-	end
+	--if gun_1 then
+	--	return r_gun_barr
+	--else
+	--	return l_gun_barr
+	--end
+	return head
 end
 
 function script.AimWeapon(num, heading, pitch)

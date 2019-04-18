@@ -60,8 +60,8 @@ for i = 1,#UnitDefs do
 		modelRadii[i] = true -- mark that we need to initialize this
 	end
 	
-	if ud.leash_range then
-		leashRangeDefs[i] = tonumber(ud.leash_range)
+	if ud.customParams.leash_range then
+		leashRangeDefs[i] = tonumber(ud.customParams.leash_range)
 	end
 end
 

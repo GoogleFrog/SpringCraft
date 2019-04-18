@@ -21,8 +21,8 @@ unitDef = {
 	
 	-- Size
 	collisionVolumeOffsets = [[0 0 0]],
-	collisionVolumeScales  = [[15 30 15]],
-	collisionVolumeType    = [[CylY]],
+	collisionVolumeScales  = [[25 25 25]],
+	collisionVolumeType    = [[sphere]],
 	objectName             = [[mbot.s3o]],
 	script                 = [[small.lua]],
 	footprintX             = 2,
@@ -35,7 +35,7 @@ unitDef = {
 	acceleration           = 2,
 	brakeRate              = 2,
 	turnRate               = 0.16*33750, -- 33750 is 180 degrees in 1 frame
-	moveState              = 0, -- Prevent movement while firing
+	stopToAttack           = true,
 
 	-- Movement defaults
 	maxReverseVelocity     = 0,
