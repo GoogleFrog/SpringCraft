@@ -28,6 +28,7 @@ unitDef = {
 	footprintX             = 2,
 	footprintZ             = 2,
 	upright                = true,
+	pathRadiusMult         = 1,
 	
 	-- Movement
 	movementClass          = [[SMALL_UNIT]],

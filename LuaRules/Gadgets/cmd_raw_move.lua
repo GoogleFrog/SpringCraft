@@ -253,15 +253,15 @@ local pushResistantUnit = {}
 ----------------------------------------------------------------------------------------------
 -- Utilities
 
-local function FindPathablePointInDirection(unitDefID, sX, sZ, dX, dZ, testSpacing, startDistance, distanceLimit)
+local function FindPathablePointInDirection(unitDefID, sX, sZ, dX, dZ, testSpacing, startDistance, distanceLimit, extraDistance)
 	-- dX and dZ must be a unit vector
 	for test = startDistance, distanceLimit, testSpacing do
 		if Spring.TestMoveOrder(unitDefID, sX + test*dX, 0, sZ + test*dZ) then
-			return sX + test*dX, sZ + test*dZ
+			return sX + (test + extraDistance)*dX, sZ + (test + extraDistance)*dZ
 		end
 	end
 	
-	return sX + distanceLimit*dX, sZ + distanceLimit*dZ
+	return sX + (distanceLimit + extraDistance)*dX, sZ + (distanceLimit + extraDistance)*dZ
 end
 
 local function IsPathFree(unitDefID, sX, sZ, gX, gZ, distance, testSpacing, distanceLimit, goalDistance, blockRelaxDistance)
@@ -712,13 +712,14 @@ local function CheckAttackMove(unitID, cx, cz, slowUpdate, n)
 				goalDist  = UNIT_RANGE[unitDefID]*0.75
 			end
 			
-			if Spring.TestMoveOrder(unitDefID, ux + checkDist*dx, 0, uz + checkDist*dz) then
-				Spring.SetUnitMoveGoal(unitID, ux + moveDist*dx, 0, uz + moveDist*dz, goalDist)
-				--attackMoveFrameWait[unitID] = n + ATTACK_MOVE_RECHECK_DELAY
-				--Spring.MarkerAddLine(ux, uy, uz, ux + moveDist*dx, 0, uz + moveDist*dz)
-				--Spring.MarkerAddPoint(ux + moveDist*dx, 0, uz + moveDist*dz, "t")
-			else
-				if ((not attackMoveFrameWait[unitID]) or n > attackMoveFrameWait[unitID]) then
+			if ((not attackMoveFrameWait[unitID]) or n > attackMoveFrameWait[unitID]) then
+				if Spring.TestMoveOrder(unitDefID, ux + checkDist*dx, 0, uz + checkDist*dz) then
+					Spring.SetUnitMoveGoal(unitID, ux + moveDist*dx, 0, uz + moveDist*dz, goalDist)
+					attackMoveFrameWait[unitID] = n + ATTACK_MOVE_RECHECK_DELAY
+					--attackMoveFrameWait[unitID] = n + ATTACK_MOVE_RECHECK_DELAY
+					--Spring.MarkerAddPoint(ux + moveDist*dx, 0, uz + moveDist*dz, "t")
+					--Spring.MarkerAddLine(ux, uy, uz, ux + moveDist*dx, 0, uz + moveDist*dz)
+				else
 					local scale = (dist + 32) -- Issue order behind enemy.
 					local sx, sz = ux + scale*dx, uz + scale*dz -- Origin
 					attackRotateDir[unitID] = attackRotateDir[unitID] or GetShortRotateDir(cx - ux, cz - uz, sx - ux, sz - uz)
@@ -728,7 +729,7 @@ local function CheckAttackMove(unitID, cx, cz, slowUpdate, n)
 					dx, dz = (-1*attackRotateDir[unitID]*dz + dFactor*dx)/length, (attackRotateDir[unitID]*dx + dFactor*dz)/length
 					
 					-- Search for pathable position from origin.
-					local gx, gz = FindPathablePointInDirection(unitDefID, sx, sz, dx, dz, TEST_CHECK_SPACING, 50, 600)
+					local gx, gz = FindPathablePointInDirection(unitDefID, sx, sz, dx, dz, TEST_CHECK_SPACING, 0, 600, 100)
 					Spring.SetUnitMoveGoal(unitID, gx, ty, gz, 32)
 					attackMoveFrameWait[unitID] = n + ATTACK_MOVE_RECHECK_DELAY
 					--Spring.MarkerAddPoint(gx, ty, gz, "g")

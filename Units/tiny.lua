@@ -28,13 +28,14 @@ unitDef = {
 	footprintX             = 2,
 	footprintZ             = 2,
 	upright                = true,
+	pathRadiusMult         = 0.8,
 	
 	-- Movement
 	movementClass          = [[SMALL_UNIT]],
 	maxVelocity            = 5,
 	acceleration           = 4.5,
-	brakeRate              = 3.5,
-	turnRate               = 0.3*33750, -- 33750 is 180 degrees in 1 frame
+	brakeRate              = 6,
+	turnRate               = 0.28*33750, -- 33750 is 180 degrees in 1 frame
 	stopToAttack           = true,
 
 	-- Movement defaults
@@ -49,7 +50,7 @@ unitDef = {
 	movestate              = 0,
 	
 	customParams           = {
-		turnaccel          = 0.4*33750,
+		turnaccel          = 0.3*33750,
 		modelradius        = 15,
 	},
 
