@@ -118,7 +118,9 @@ local unitQueueCheckRequired = false
 local unitQueuesToCheck = {}
 
 local attackMoveUnit = {}
+local attackRotateDir = {}
 local attackMoveFrameWait = {}
+local attackMoveHash = {}
 
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
@@ -146,9 +148,9 @@ local FORMATION_SHRINK = 0.97
 local STOP_RADIUS_INC_FACTOR = 1.2
 local STOP_DIST_FACTOR = 1.5
 
-local SLOW_UPDATE_RATE = 6
+local SLOW_UPDATE_RATE = 10
 local ATTACK_MOVE_CHECK_RATE = 2
-local ATTACK_MOVE_RECHECK_DELAY = 90
+local ATTACK_MOVE_RECHECK_DELAY = 45
 
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
@@ -431,7 +433,13 @@ local function ProcessUnitCommandOffets(unitDefID, cmdStr, cx, cz)
 	end
 end
 
-function GG.SetPushResistant(unitID, newState)
+local function GetShortRotateDir(aX, aZ, bX, bZ)
+	-- Returns 1 if the shortest way to rotate A to B is counter-clockwise. Returns -1 otherwise.
+	crossY = aZ*bX - aX*bZ -- Y component of A cross product B.
+	return (crossY > 0 and 1) or -1
+end
+
+local function SetPushResistant(unitID, newState)
 	if pushResistantUnit[unitID] == newState then
 		return
 	end
@@ -644,14 +652,22 @@ end
 ----------------------------------------------------------------------------------------------
 -- Attack Handling
 
-local function CheckAttackMove(unitID, slowUpdate, n)
+local function CheckAttackMove(unitID, cx, cz, slowUpdate, n)
 	local tarType, isUser, targetID = Spring.GetUnitWeaponTarget(unitID, 1)
 	if targetID then
 		--Spring.Utilities.UnitEcho(targetID, "t")
 		local inRange = Spring.GetUnitWeaponTestRange(unitID, 1, targetID)
 		if inRange then
 			StopUnit(unitID, true)
-		elseif slowUpdate and ((not attackMoveFrameWait[unitID]) or attackMoveFrameWait[unitID] < n) then
+		elseif slowUpdate then
+			-- Reset some data if a new attack move command comes in.
+			local hash = cx + 100000*cz
+			if (not attackMoveHash[unitID]) or attackMoveHash[unitID] ~= hash then
+				attackMoveHash[unitID] = hash
+				attackMoveFrameWait[unitID] = nil
+				attackRotateDir[unitID] = nil
+			end
+			
 			local tx, ty, tz = Spring.GetUnitPosition(targetID)
 			
 			-- Issue move goal to move behind enemy unit at the closest pathable position to the left or right.
@@ -662,27 +678,30 @@ local function CheckAttackMove(unitID, slowUpdate, n)
 			
 			local unitDefID = Spring.GetUnitDefID(unitID)
 			if Spring.TestMoveOrder(unitDefID, ux + (dist - 26)*dx, 0, uz + (dist - 26)*dz) then
-				Spring.SetUnitMoveGoal(unitID, tx, ty, tz, 32)
-				--Spring.MarkerAddPoint(tx, ty, tz, "t")
+				Spring.SetUnitMoveGoal(unitID, ux + (dist - 26)*dx, 0, uz + (dist - 26)*dz, 8)
+				attackMoveFrameWait[unitID] = n + ATTACK_MOVE_RECHECK_DELAY
+				--Spring.MarkerAddPoint(ux + (dist - 26)*dx, 0, uz + (dist - 26)*dz, "t")
 			else
-				local scale = (dist + 32) -- Issue order behind enemy.
-				local dir = 2*(unitID%2) - 1 -- Rotation direction, {-1, 1}
-				
-				local sx, sz = ux + scale*dx, uz + scale*dz -- Origin
-				
-				-- 135 degree rotation.
-				dx, dz = (-1*dir*dz + dx)*INV_SQRT_2, (dir*dx + dz)*INV_SQRT_2
-				
-				-- Search for pathable position from origin.
-				local gx, gz = FindPathablePointInDirection(unitDefID, sx, sz, dx, dz, TEST_CHECK_SPACING, 120, 500)
-				Spring.SetUnitMoveGoal(unitID, gx, ty, gz, 32)
-				--Spring.MarkerAddPoint(gx, ty, gz, "g")
-				--Spring.MarkerAddLine(gx, ty, gz, tx, ty, tz)
-				--Spring.MarkerAddLine(ux, uy, uz, tx, ty, tz)
+				if ((not attackMoveFrameWait[unitID]) or n > attackMoveFrameWait[unitID]) then
+					local scale = (dist + 32) -- Issue order behind enemy.
+					local sx, sz = ux + scale*dx, uz + scale*dz -- Origin
+					attackRotateDir[unitID] = attackRotateDir[unitID] or GetShortRotateDir(cx - ux, cz - uz, sx - ux, sz - uz)
+					
+					local dFactor = math.random() -- Between 90 and 135 degrees
+					local length = math.sqrt(1 + dFactor*dFactor)
+					dx, dz = (-1*attackRotateDir[unitID]*dz + dFactor*dx)/length, (attackRotateDir[unitID]*dx + dFactor*dz)/length
+					
+					-- Search for pathable position from origin.
+					local gx, gz = FindPathablePointInDirection(unitDefID, sx, sz, dx, dz, TEST_CHECK_SPACING, 50, 600)
+					Spring.SetUnitMoveGoal(unitID, gx, ty, gz, 32)
+					attackMoveFrameWait[unitID] = n + ATTACK_MOVE_RECHECK_DELAY
+					--Spring.MarkerAddPoint(gx, ty, gz, "g")
+					--Spring.MarkerAddLine(gx, ty, gz, tx, ty, tz)
+					--Spring.MarkerAddLine(ux, uy, uz, tx, ty, tz)
+				end
 			end
-			attackMoveFrameWait[unitID] = n + ATTACK_MOVE_RECHECK_DELAY
 		end
-		GG.SetPushResistant(unitID, inRange)
+		SetPushResistant(unitID, inRange)
 		SetRehandlingRequired(unitID)
 		return true
 	end
@@ -693,7 +712,7 @@ local function CheckAllAttackMoveUnits(n)
 	for unitID, _ in pairs(attackMoveUnit) do
 		local cmdID, _, cmdTag, cmdParam_1, cmdParam_2, cmdParam_3 = Spring.GetUnitCurrentCommand(unitID)
 		if cmdID == CMD_RAW_ATTACK and cmdParam_3 then
-			CheckAttackMove(unitID, (n + unitID)%SLOW_UPDATE_RATE < ATTACK_MOVE_CHECK_RATE, n)
+			CheckAttackMove(unitID, cmdParam_1, cmdParam_3, (n + unitID)%SLOW_UPDATE_RATE < ATTACK_MOVE_CHECK_RATE, n)
 		else
 			attackMoveUnit[unitID] = nil
 		end
@@ -710,12 +729,12 @@ function gadget:CommandFallback(unitID, unitDefID, teamID, cmdID, cmdParams, cmd
 	end
 	if cmdID == CMD_RAW_ATTACK then
 		attackMoveUnit[unitID] = true
-		if CheckAttackMove(unitID) then
+		if CheckAttackMove(unitID, cmdParams[1], cmdParams[3]) then
 			return true, false
 		end
 	end
 	
-	GG.SetPushResistant(unitID, false)
+	SetPushResistant(unitID, false)
 	
 	if delayedInit[unitID] then
 		if (delayedInit[unitID] == (cmdParams[1] or 0) .. "_" .. (cmdParams[3] or 0)) then
@@ -1010,6 +1029,7 @@ function gadget:Initialize()
 
 	GG.AddRawMoveUnit = AddRawMoveUnit
 	GG.StopUnit = StopUnit
+	GG.SetPushResistant = SetPushResistant
 	GG.RawMove_IsPathFree = RawMove_IsPathFree
 	GG.WaitWaitMoveUnit = WaitWaitMoveUnit
 end
@@ -1037,8 +1057,10 @@ end
 function gadget:UnitDestroyed(unitID, unitDefID, teamID)
 	if unitID then
 		rawMoveUnit[unitID] = nil
-		attackMoveFrameWait[unitID] = nil
 		attackMoveUnit[unitID] = nil
+		attackRotateDir[unitID] = nil
+		attackMoveFrameWait[unitID] = nil
+		attackMoveHash[unitID] = nil
 		pushResistantUnit[unitID] = nil
 		if unitDefID and constructorBuildDistDefs[unitDefID] and constructorByID[unitID] then
 			RemoveConstructor(unitID)
