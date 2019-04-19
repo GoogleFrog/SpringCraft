@@ -34,9 +34,10 @@ unitDef = {
 	movementClass          = [[SMALL_UNIT]],
 	maxVelocity            = 5,
 	acceleration           = 4.5,
-	brakeRate              = 6,
-	turnRate               = 0.28*33750, -- 33750 is 180 degrees in 1 frame
+	brakeRate              = 4.2,
+	turnRate               = 0.2*33750, -- 33750 is 180 degrees in 1 frame
 	stopToAttack           = true,
+	turnSpeedModMult       = 0.2,
 
 	-- Movement defaults
 	maxReverseVelocity     = 0,
@@ -44,13 +45,13 @@ unitDef = {
 	blocking               = true,
 	collide                = true,
 	turnInPlace            = true,
-	turnInPlaceSpeedLimit  = 10,
-	turnInPlaceAngleLimit  = 0,
+	turnInPlaceSpeedLimit  = 0,
+	turnInPlaceAngleLimit  = 30,
 	pushResistant          = false, -- Sometimes set to true in LUS
 	movestate              = 0,
 	
 	customParams           = {
-		turnaccel          = 0.3*33750,
+		turnaccel          = 0.2*33750,
 		modelradius        = 15,
 	},
 
