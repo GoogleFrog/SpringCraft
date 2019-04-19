@@ -154,11 +154,10 @@ function script.FireWeapon(num)
 		Spin(l_gun_barr, z_axis, math.rad(1000), math.rad(50))
 	end
 	
+	busyTime = 22
 	if not busyTime then
-		busyTime = 1
 		StartThread(RestoreAfterDelay)
 	end
-	busyTime = math.min(2, busyTime + 1)
 end
 
 function script.Killed(recentDamage, maxHealth)

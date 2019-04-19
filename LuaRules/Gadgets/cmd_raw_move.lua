@@ -121,6 +121,7 @@ local attackMoveUnit = {}
 local attackRotateDir = {}
 local attackMoveFrameWait = {}
 local attackMoveHash = {}
+local targetPopularity = nil
 
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
@@ -147,18 +148,27 @@ local FORMATION_SHRINK = 0.97
 
 local STOP_RADIUS_INC_FACTOR = 1.2
 local STOP_DIST_FACTOR = 1.5
+local SHORT_GATHER_DIST = 40
 
 local SLOW_UPDATE_RATE = 10
 local ATTACK_MOVE_CHECK_RATE = 2
-local ATTACK_MOVE_RECHECK_DELAY = 45
+local ATTACK_MOVE_RECHECK_DELAY = 40
 
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
 -- Unit Configuration
 local constructorBuildDistDefs = {}
+local UNIT_RANGE = {}
+local UNIT_SIZE = {}
+local IS_MELEE = {}
 
 for i = 1, #UnitDefs do
 	local ud = UnitDefs[i]
+	
+	UNIT_RANGE[i] = ud.maxWeaponRange
+	IS_MELEE[i]   = ud.maxWeaponRange < 80
+	UNIT_SIZE[i]  = 8*ud.xsize
+	
 	if ud.canMove then
 		if ud.isMobileBuilder and (not ud.isAirUnit) then
 			constructorBuildDistDefs[i] = math.max(50, ud.buildDistance  - 10)
@@ -373,6 +383,11 @@ local function ProcessUnitCommandOffets(unitDefID, cmdStr, cx, cz)
 	end
 	avX, avZ = avX/count, avZ/count
 	--Spring.MarkerAddPoint(avX, 0, avZ, "av")
+	--Spring.Echo("SHORT_GATHER_DIST", math.sqrt((avX - cx)^2 + (avZ - cz)^2), SHORT_GATHER_DIST)
+	
+	if math.sqrt((avX - cx)^2 + (avZ - cz)^2) < SHORT_GATHER_DIST then
+		return
+	end
 	
 	local dist = {}
 	local maxUnitDist
@@ -447,6 +462,7 @@ local function SetPushResistant(unitID, newState)
 	--Spring.SetUnitMass(unitID, (newState and 1000000) or 10)
 	Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushResistant", newState)
 	Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushPriority", (newState and (Spring.GetGameFrame() -100000000)) or 0)
+	--Spring.Utilities.UnitEcho(unitID, (newState and (Spring.GetGameFrame() -100000000)) or 0)
 end
 
 ----------------------------------------------------------------------------------------------
@@ -668,7 +684,8 @@ local function CheckAttackMove(unitID, cx, cz, slowUpdate, n)
 				attackRotateDir[unitID] = nil
 			end
 			
-			local tx, ty, tz = Spring.GetUnitPosition(targetID)
+			local tx, ty, tz  = Spring.GetUnitPosition(targetID)
+			local targetDefID = Spring.GetUnitDefID(targetID)
 			
 			-- Issue move goal to move behind enemy unit at the closest pathable position to the left or right.
 			local ux, uy, uz = Spring.GetUnitPosition(unitID)
@@ -677,10 +694,29 @@ local function CheckAttackMove(unitID, cx, cz, slowUpdate, n)
 			dx, dz = dx/dist, dz/dist
 			
 			local unitDefID = Spring.GetUnitDefID(unitID)
-			if Spring.TestMoveOrder(unitDefID, ux + (dist - 26)*dx, 0, uz + (dist - 26)*dz) then
-				Spring.SetUnitMoveGoal(unitID, ux + (dist - 26)*dx, 0, uz + (dist - 26)*dz, 8)
-				attackMoveFrameWait[unitID] = n + ATTACK_MOVE_RECHECK_DELAY
-				--Spring.MarkerAddPoint(ux + (dist - 26)*dx, 0, uz + (dist - 26)*dz, "t")
+			local checkDist, moveDist, goalDist
+			if IS_MELEE[unitDefID] then
+				checkDist = dist - UNIT_SIZE[targetDefID] - UNIT_SIZE[unitDefID]/2
+				moveDist  = dist - UNIT_SIZE[targetDefID]
+				goalDist  = 8
+				
+				targetPopularity = targetPopularity or {}
+				targetPopularity[targetID] = (targetPopularity[targetID] or 0) + 1
+				if targetPopularity[targetID] > 2 then
+					checkDist = dist + UNIT_SIZE[targetDefID] + UNIT_SIZE[unitDefID]/2
+					moveDist  = dist + UNIT_SIZE[targetDefID]
+				end
+			else
+				checkDist = dist - UNIT_SIZE[unitDefID]
+				moveDist  = dist - UNIT_SIZE[unitDefID]
+				goalDist  = UNIT_RANGE[unitDefID]*0.75
+			end
+			
+			if Spring.TestMoveOrder(unitDefID, ux + checkDist*dx, 0, uz + checkDist*dz) then
+				Spring.SetUnitMoveGoal(unitID, ux + moveDist*dx, 0, uz + moveDist*dz, goalDist)
+				--attackMoveFrameWait[unitID] = n + ATTACK_MOVE_RECHECK_DELAY
+				--Spring.MarkerAddLine(ux, uy, uz, ux + moveDist*dx, 0, uz + moveDist*dz)
+				--Spring.MarkerAddPoint(ux + moveDist*dx, 0, uz + moveDist*dz, "t")
 			else
 				if ((not attackMoveFrameWait[unitID]) or n > attackMoveFrameWait[unitID]) then
 					local scale = (dist + 32) -- Issue order behind enemy.
@@ -716,6 +752,11 @@ local function CheckAllAttackMoveUnits(n)
 		else
 			attackMoveUnit[unitID] = nil
 		end
+	end
+	
+	-- This is pretty bad, need a better way to track targets.
+	if n%SLOW_UPDATE_RATE == 0 then
+		targetPopularity = nil
 	end
 end
 
