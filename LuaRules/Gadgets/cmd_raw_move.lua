@@ -1,11 +1,11 @@
 function gadget:GetInfo()
 	return {
-		name 	= "Command Raw Move",
-		desc	= "Make unit move ahead at all cost!",
-		author	= "xponen, GoogleFrog",
-		date	= "June 12 2014",
-		license	= "GNU GPL, v2 or later",
-		layer	= 0,
+		name    = "Command Raw Move",
+		desc    = "Make unit move ahead at all cost!",
+		author  = "xponen, GoogleFrog",
+		date    = "June 12 2014",
+		license = "GNU GPL, v2 or later",
+		layer   = 0,
 		enabled = true,
 	}
 end
@@ -33,6 +33,8 @@ local CMD_RECLAIM = CMD.RECLAIM
 local CMD_MOVE    = CMD.MOVE
 
 local MAX_UNITS = Game.maxUnits
+
+local INV_SQRT_2 = 1/math.sqrt(2)
 
 local rawBuildUpdateIgnore = {
 	[CMD.ONOFF] = true,
@@ -116,12 +118,14 @@ local unitQueueCheckRequired = false
 local unitQueuesToCheck = {}
 
 local attackMoveUnit = {}
+local attackMoveFrameWait = {}
 
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
 -- Configuration
 
 local TEST_MOVE_SPACING = 16
+local TEST_CHECK_SPACING = 32
 local LAZY_TEST_MOVE_SPACING = 8
 local LAZY_SEARCH_DISTANCE = 450
 local BLOCK_RELAX_DISTANCE = 250
@@ -142,8 +146,9 @@ local FORMATION_SHRINK = 0.97
 local STOP_RADIUS_INC_FACTOR = 1.2
 local STOP_DIST_FACTOR = 1.5
 
-local SLOW_UPDATE_RATE = 15
+local SLOW_UPDATE_RATE = 6
 local ATTACK_MOVE_CHECK_RATE = 2
+local ATTACK_MOVE_RECHECK_DELAY = 90
 
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
@@ -235,6 +240,17 @@ local pushResistantUnit = {}
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
 -- Utilities
+
+local function FindPathablePointInDirection(unitDefID, sX, sZ, dX, dZ, testSpacing, startDistance, distanceLimit)
+	-- dX and dZ must be a unit vector
+	for test = startDistance, distanceLimit, testSpacing do
+		if Spring.TestMoveOrder(unitDefID, sX + test*dX, 0, sZ + test*dZ) then
+			return sX + test*dX, sZ + test*dZ
+		end
+	end
+	
+	return sX + distanceLimit*dX, sZ + distanceLimit*dZ
+end
 
 local function IsPathFree(unitDefID, sX, sZ, gX, gZ, distance, testSpacing, distanceLimit, goalDistance, blockRelaxDistance)
 	local vX = gX - sX
@@ -422,6 +438,7 @@ function GG.SetPushResistant(unitID, newState)
 	pushResistantUnit[unitID] = newState
 	--Spring.SetUnitMass(unitID, (newState and 1000000) or 10)
 	Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushResistant", newState)
+	Spring.MoveCtrl.SetGroundMoveTypeData(unitID, "pushPriority", (newState and (Spring.GetGameFrame() -100000000)) or 0)
 end
 
 ----------------------------------------------------------------------------------------------
@@ -627,23 +644,43 @@ end
 ----------------------------------------------------------------------------------------------
 -- Attack Handling
 
-local function CheckAttackMove(unitID, slowUpdate)
+local function CheckAttackMove(unitID, slowUpdate, n)
 	local tarType, isUser, targetID = Spring.GetUnitWeaponTarget(unitID, 1)
 	if targetID then
 		--Spring.Utilities.UnitEcho(targetID, "t")
 		local inRange = Spring.GetUnitWeaponTestRange(unitID, 1, targetID)
 		if inRange then
 			StopUnit(unitID, true)
-		elseif slowUpdate then
-			local mx, my, mz = Spring.GetUnitPosition(targetID)
+		elseif slowUpdate and ((not attackMoveFrameWait[unitID]) or attackMoveFrameWait[unitID] < n) then
+			local tx, ty, tz = Spring.GetUnitPosition(targetID)
 			
-			-- Issue move goal to move behind enemy unit.
+			-- Issue move goal to move behind enemy unit at the closest pathable position to the left or right.
 			local ux, uy, uz = Spring.GetUnitPosition(unitID)
-			local dx, dz = mx - ux, mz - uz
+			local dx, dz = tx - ux, tz - uz
 			local dist = math.sqrt(dx*dx + dz*dz)
-			local scale = (dist + 32)/dist
+			dx, dz = dx/dist, dz/dist
 			
-			Spring.SetUnitMoveGoal(unitID, ux + scale*dx, my, uz + scale*dz, 8)
+			local unitDefID = Spring.GetUnitDefID(unitID)
+			if Spring.TestMoveOrder(unitDefID, ux + (dist - 26)*dx, 0, uz + (dist - 26)*dz) then
+				Spring.SetUnitMoveGoal(unitID, tx, ty, tz, 32)
+				--Spring.MarkerAddPoint(tx, ty, tz, "t")
+			else
+				local scale = (dist + 32) -- Issue order behind enemy.
+				local dir = 2*(unitID%2) - 1 -- Rotation direction, {-1, 1}
+				
+				local sx, sz = ux + scale*dx, uz + scale*dz -- Origin
+				
+				-- 135 degree rotation.
+				dx, dz = (-1*dir*dz + dx)*INV_SQRT_2, (dir*dx + dz)*INV_SQRT_2
+				
+				-- Search for pathable position from origin.
+				local gx, gz = FindPathablePointInDirection(unitDefID, sx, sz, dx, dz, TEST_CHECK_SPACING, 120, 500)
+				Spring.SetUnitMoveGoal(unitID, gx, ty, gz, 32)
+				--Spring.MarkerAddPoint(gx, ty, gz, "g")
+				--Spring.MarkerAddLine(gx, ty, gz, tx, ty, tz)
+				--Spring.MarkerAddLine(ux, uy, uz, tx, ty, tz)
+			end
+			attackMoveFrameWait[unitID] = n + ATTACK_MOVE_RECHECK_DELAY
 		end
 		GG.SetPushResistant(unitID, inRange)
 		SetRehandlingRequired(unitID)
@@ -656,7 +693,7 @@ local function CheckAllAttackMoveUnits(n)
 	for unitID, _ in pairs(attackMoveUnit) do
 		local cmdID, _, cmdTag, cmdParam_1, cmdParam_2, cmdParam_3 = Spring.GetUnitCurrentCommand(unitID)
 		if cmdID == CMD_RAW_ATTACK and cmdParam_3 then
-			CheckAttackMove(unitID, (n + unitID)%SLOW_UPDATE_RATE < ATTACK_MOVE_CHECK_RATE)
+			CheckAttackMove(unitID, (n + unitID)%SLOW_UPDATE_RATE < ATTACK_MOVE_CHECK_RATE, n)
 		else
 			attackMoveUnit[unitID] = nil
 		end
@@ -1000,11 +1037,14 @@ end
 function gadget:UnitDestroyed(unitID, unitDefID, teamID)
 	if unitID then
 		rawMoveUnit[unitID] = nil
+		attackMoveFrameWait[unitID] = nil
+		attackMoveUnit[unitID] = nil
 		pushResistantUnit[unitID] = nil
 		if unitDefID and constructorBuildDistDefs[unitDefID] and constructorByID[unitID] then
 			RemoveConstructor(unitID)
 		end
 	end
+	
 end
 
 local needGlobalWaitWait = false
