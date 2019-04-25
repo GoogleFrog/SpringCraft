@@ -120,6 +120,7 @@ local unitQueuesToCheck = {}
 local attackMoveUnit = {}
 local attackRotateDir = {}
 local attackMoveFrameWait = {}
+local attackMoveTargetFrameWait = {}
 local attackMoveHash = {}
 local targetPopularity = nil
 
@@ -153,6 +154,7 @@ local SHORT_GATHER_DIST = 40
 local SLOW_UPDATE_RATE = 10
 local ATTACK_MOVE_CHECK_RATE = 2
 local ATTACK_MOVE_RECHECK_DELAY = 40
+local ATTACK_MOVE_TARGET_RECHECK_DELAY = 20
 
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
@@ -681,6 +683,7 @@ local function CheckAttackMove(unitID, cx, cz, slowUpdate, n)
 			if (not attackMoveHash[unitID]) or attackMoveHash[unitID] ~= hash then
 				attackMoveHash[unitID] = hash
 				attackMoveFrameWait[unitID] = nil
+				attackMoveFrameWait[unitID] = nil
 				attackRotateDir[unitID] = nil
 			end
 			
@@ -712,14 +715,15 @@ local function CheckAttackMove(unitID, cx, cz, slowUpdate, n)
 				goalDist  = UNIT_RANGE[unitDefID]*0.75
 			end
 			
-			if ((not attackMoveFrameWait[unitID]) or n > attackMoveFrameWait[unitID]) then
+			if ((not attackMoveTargetFrameWait[unitID]) or n > attackMoveTargetFrameWait[unitID]) then
 				if Spring.TestMoveOrder(unitDefID, ux + checkDist*dx, 0, uz + checkDist*dz) then
 					Spring.SetUnitMoveGoal(unitID, ux + moveDist*dx, 0, uz + moveDist*dz, goalDist)
 					attackMoveFrameWait[unitID] = n + ATTACK_MOVE_RECHECK_DELAY
+					attackMoveTargetFrameWait[unitID] = n + ATTACK_MOVE_TARGET_RECHECK_DELAY
 					--attackMoveFrameWait[unitID] = n + ATTACK_MOVE_RECHECK_DELAY
 					--Spring.MarkerAddPoint(ux + moveDist*dx, 0, uz + moveDist*dz, "t")
 					--Spring.MarkerAddLine(ux, uy, uz, ux + moveDist*dx, 0, uz + moveDist*dz)
-				else
+				elseif ((not attackMoveFrameWait[unitID]) or n > attackMoveFrameWait[unitID]) then
 					local scale = (dist + 32) -- Issue order behind enemy.
 					local sx, sz = ux + scale*dx, uz + scale*dz -- Origin
 					attackRotateDir[unitID] = attackRotateDir[unitID] or GetShortRotateDir(cx - ux, cz - uz, sx - ux, sz - uz)
@@ -1102,6 +1106,7 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID)
 		attackMoveUnit[unitID] = nil
 		attackRotateDir[unitID] = nil
 		attackMoveFrameWait[unitID] = nil
+		attackMoveTargetFrameWait[unitID] = nil
 		attackMoveHash[unitID] = nil
 		pushResistantUnit[unitID] = nil
 		if unitDefID and constructorBuildDistDefs[unitDefID] and constructorByID[unitID] then
