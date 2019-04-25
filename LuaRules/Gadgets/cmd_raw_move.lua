@@ -670,6 +670,53 @@ end
 ----------------------------------------------------------------------------------------------
 -- Attack Handling
 
+local DIR = {
+	{-1, 0},
+	{1, 0},
+	{math.cos(math.rad(60)), math.sin(math.rad(60))},
+	{math.cos(math.rad(60)), -1*math.sin(math.rad(60))},
+	{-1*math.cos(math.rad(60)), math.sin(math.rad(60))},
+	{-1*math.cos(math.rad(60)), -1*math.sin(math.rad(60))},
+}
+
+local function GetEngagementMoveGoal(unitDefID, targetID, targetDefID, ux, uz, dx, dz, dist)
+	local targetSize = UNIT_SIZE[targetDefID]
+	if not IS_MELEE[unitDefID] then
+		local goalDist = UNIT_RANGE[unitDefID]*0.75
+		local gx, gz = ux + (dist - targetSize)*dx, uz + (dist - targetSize)*dz
+		if Spring.TestMoveOrder(unitDefID, gx, 0, gz) then
+			return gx, gz, goalDist
+		end
+		gx, gz = ux + (dist + targetSize)*dx, uz + (dist + targetSize)*dz
+		if Spring.TestMoveOrder(unitDefID, gx, 0, gz) then
+			return gx, gz, goalDist
+		end
+		return false
+	end
+	
+	local popularTarget = (targetPopularity[targetID] > 2)
+	local check = 1
+	if popularTarget then
+		check = 2
+	end
+	local gx, gz
+	local px, pz = -1*dz, dx
+	local ox, oz = ux + dist*dx, uz + dist*dz
+	local checkRange = targetSize + UNIT_SIZE[unitDefID]/2
+	for i = 1, 6 do
+		gx = ox + checkRange*(dx*DIR[check][1] + px*DIR[check][2])
+		gz = oz + checkRange*(dz*DIR[check][1] + pz*DIR[check][2])
+		if Spring.TestMoveOrder(unitDefID, gx, 0, gz) then
+			local tx = ox + targetSize*(dx*DIR[check][1] + px*DIR[check][2])
+			local tz = oz + targetSize*(dz*DIR[check][1] + pz*DIR[check][2])
+			return tx, tz, 8
+		end
+		check = (check)%6 + 1
+	end
+	return false
+end
+
+
 local function CheckAttackMove(unitID, cx, cz, slowUpdate, n)
 	local tarType, isUser, targetID = Spring.GetUnitWeaponTarget(unitID, 1)
 	if targetID then
@@ -699,25 +746,15 @@ local function CheckAttackMove(unitID, cx, cz, slowUpdate, n)
 			local unitDefID = Spring.GetUnitDefID(unitID)
 			local checkDist, moveDist, goalDist
 			if IS_MELEE[unitDefID] then
-				checkDist = dist - UNIT_SIZE[targetDefID] - UNIT_SIZE[unitDefID]/2
-				moveDist  = dist - UNIT_SIZE[targetDefID]
-				goalDist  = 8
-				
 				targetPopularity = targetPopularity or {}
 				targetPopularity[targetID] = (targetPopularity[targetID] or 0) + 1
-				if targetPopularity[targetID] > 2 then
-					checkDist = dist + UNIT_SIZE[targetDefID] + UNIT_SIZE[unitDefID]/2
-					moveDist  = dist + UNIT_SIZE[targetDefID]
-				end
-			else
-				checkDist = dist - UNIT_SIZE[unitDefID]
-				moveDist  = dist - UNIT_SIZE[unitDefID]
-				goalDist  = UNIT_RANGE[unitDefID]*0.75
 			end
 			
 			if ((not attackMoveTargetFrameWait[unitID]) or n > attackMoveTargetFrameWait[unitID]) then
-				if Spring.TestMoveOrder(unitDefID, ux + checkDist*dx, 0, uz + checkDist*dz) then
-					Spring.SetUnitMoveGoal(unitID, ux + moveDist*dx, 0, uz + moveDist*dz, goalDist)
+				local gx, gz, goalDist = GetEngagementMoveGoal(unitDefID, targetID, targetDefID, ux, uz, dx, dz, dist)
+				
+				if gx and gz then -- Spring.TestMoveOrder(unitDefID, ux + checkDist*dx, 0, uz + checkDist*dz) then
+					Spring.SetUnitMoveGoal(unitID, gx, 0, gz, goalDist)
 					attackMoveFrameWait[unitID] = n + ATTACK_MOVE_RECHECK_DELAY
 					attackMoveTargetFrameWait[unitID] = n + ATTACK_MOVE_TARGET_RECHECK_DELAY
 					--attackMoveFrameWait[unitID] = n + ATTACK_MOVE_RECHECK_DELAY

@@ -14,7 +14,7 @@ local modRules = {
 		allowHoverUnitStrafing     = true,
 	},
 	system = {
-		pathFinderSystem = 0, -- legacy
+		pathFinderSystem = 0, -- legacy = 0, QTPFS = 1
 		pfRawDistMult = 1.25,
 		pfUpdateRate = 0.007,
 	},
